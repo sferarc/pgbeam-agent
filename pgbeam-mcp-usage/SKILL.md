@@ -1,6 +1,6 @@
 ---
 name: pgbeam-mcp-usage
-description: Drive PgBeam's hosted Postgres MCP tools well once an agent is connected. Use this when the agent is already wired to a PgBeam MCP server (query, list_tables, describe_table, explain, schema_catalog) and needs to explore a schema and run SQL efficiently against policy-enforced, read-only-by-default, PII-masked, audited access. For the initial wiring and credential setup, use pgbeam-connect first.
+description: Drive PgBeam's hosted Postgres MCP tools well once an agent is connected. Use this when the agent is already wired to a PgBeam MCP server (query, validate_sql, list_tables, describe_table, explain, schema_catalog, plus search_docs and read_doc) and needs to explore a schema and run SQL efficiently against policy-enforced, read-only-by-default, PII-masked, audited access. For the initial wiring and credential setup, use pgbeam-connect first.
 ---
 
 # Use PgBeam's hosted Postgres MCP tools well
@@ -10,10 +10,12 @@ server (see the `pgbeam-connect` skill for wiring). It explains how to explore a
 schema and run SQL efficiently, and how the policy layer shapes what you get
 back so you can work with it instead of fighting it.
 
-The server exposes five tools: `query`, `list_tables`, `describe_table`,
-`explain`, and `schema_catalog`. Every call runs through the same wire-level
-policy as a normal connection: read-only by default, table and column
-allowlists, PII masking, per-credential budgets, and a full audit trail.
+The server exposes eight tools. Six are database tools: `query`, `validate_sql`,
+`list_tables`, `describe_table`, `explain`, and `schema_catalog`. Every database
+call runs through the same wire-level policy as a normal connection: read-only by
+default, table and column allowlists, PII masking, per-credential budgets, and a
+full audit trail. The other two, `search_docs` and `read_doc`, look up how PgBeam
+works; they are read-only and not database-scoped.
 
 ## Start with schema_catalog, not information_schema
 
@@ -46,6 +48,11 @@ Use `query` for SQL. Assume read-only: `SELECT` and read-side CTEs work; writes
 (`INSERT`, `UPDATE`, `DELETE`, DDL) are rejected unless the policy profile
 explicitly allows them, which it does not by default. Do not attempt writes to
 probe the policy; a blocked write is an audited event.
+
+Use `validate_sql` to check a statement's table and column references against the
+schema you are allowed to see before you run it. It returns any unknown or
+ambiguous names with ranked suggestions, so you can fix a hallucinated name
+without spending a failed query on it.
 
 Use `explain` (which returns `EXPLAIN (FORMAT JSON)`) before running a query you
 expect to be expensive, so you can check the plan against the row-count estimates
