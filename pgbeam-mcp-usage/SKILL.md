@@ -1,6 +1,6 @@
 ---
 name: pgbeam-mcp-usage
-description: Drive PgBeam's hosted Postgres MCP tools well once an agent is connected. Use this when the agent is already wired to a PgBeam MCP server (query, validate_sql, list_tables, describe_table, explain, schema_catalog, plus search_docs and read_doc) and needs to explore a schema and run SQL efficiently against policy-enforced, read-only-by-default, PII-masked, audited access. For the initial wiring and credential setup, use pgbeam-connect first.
+description: Drive PgBeam's hosted Postgres MCP tools well once an agent is connected. Use this when the agent is already wired to a PgBeam MCP server (query, validate_sql, list_tables, describe_table, explain, schema_catalog, my_permissions, plus search_docs and read_doc) and needs to explore a schema and run SQL efficiently against policy-enforced, read-only-by-default, PII-masked, audited access. For the initial wiring and credential setup, use pgbeam-connect first.
 ---
 
 # Use PgBeam's hosted Postgres MCP tools well
@@ -10,12 +10,29 @@ server (see the `pgbeam-connect` skill for wiring). It explains how to explore a
 schema and run SQL efficiently, and how the policy layer shapes what you get
 back so you can work with it instead of fighting it.
 
-The server exposes eight tools. Six are database tools: `query`, `validate_sql`,
-`list_tables`, `describe_table`, `explain`, and `schema_catalog`. Every database
-call runs through the same wire-level policy as a normal connection: read-only by
-default, table and column allowlists, PII masking, per-credential budgets, and a
-full audit trail. The other two, `search_docs` and `read_doc`, look up how PgBeam
-works; they are read-only and not database-scoped.
+The server exposes nine tools. Seven are database tools: `query`, `validate_sql`,
+`list_tables`, `describe_table`, `explain`, `schema_catalog`, and
+`my_permissions`. Every database call runs through the same wire-level policy as
+a normal connection: read-only by default, table and column allowlists, PII
+masking, per-credential budgets, and a full audit trail. The other two,
+`search_docs` and `read_doc`, look up how PgBeam works; they are read-only and
+not database-scoped.
+
+## Ask what you may do before you find out the hard way
+
+Call `my_permissions` once at the start of a session. It takes no arguments,
+costs no database round-trip, and returns this credential's effective policy:
+access mode, which statement kinds are permitted, the table allowlist and
+denylist, which tables are row-filtered, which columns come back masked, the
+query/row/egress budgets and statement timeout, how a permitted write is routed
+(commit, rollback, or sandbox) and whether it waits for a human, plus the safety
+floor no policy can switch off.
+
+Knowing this up front is cheaper than discovering it: a blocked statement costs
+a round trip and lands in the audit log. Two things it will not tell you, by
+design: the project's honeytokens (a decoy you could enumerate would not be a
+decoy) and the text of a row-filter predicate, though the filtered table is
+named so you know your result set is a slice rather than the whole table.
 
 ## Start with schema_catalog, not information_schema
 
@@ -67,12 +84,28 @@ a budget was exceeded. Treat a block as information, not a dead end:
 - **Not allowed / relation denied:** the table or column is outside the
   allowlist. Query an allowed relation instead.
 - **Read-only:** the statement tried to write. Rephrase as a read, or the
-  operator must grant the write in the policy profile.
+  operator must grant the write in the policy profile. `my_permissions` says
+  up front whether writes are available at all.
 - **Budget exceeded:** you hit the per-credential row or cost limit. Narrow the
   query (add a `WHERE`, a `LIMIT`, or an aggregate) rather than retrying the same
   broad scan.
 
 Adjust and retry based on the reason. Do not loop on the identical failing query.
+
+## Pace yourself against the budget block
+
+When the credential is capped, `query`, `explain`, `list_tables`, and
+`describe_table` return a `budget` block alongside the rows: `limit`, `used`,
+`remaining`, and `resets_at` for each capped window (`queries_per_hour`,
+`queries_per_day`, `egress_bytes_per_day`). A window the policy leaves uncapped
+is omitted, and an uncapped credential gets no block at all.
+
+Read `remaining` before starting anything long. If a plan needs more calls than
+are left, do the expensive part first, batch reads into fewer statements, or
+stop and say what you could not finish, rather than spending the last of the
+budget and being blocked mid-task. The counts are per-region approximations and
+the egress figure can trail your last statement by a moment, so leave headroom
+instead of aiming at zero.
 
 ## What you can rely on
 
