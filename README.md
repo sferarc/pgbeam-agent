@@ -28,3 +28,17 @@ serves a machine-readable index with per-skill integrity digests:
 
 - Index: `https://pgbeam.com/.well-known/agent-skills/index.json`
 - Each body: `https://pgbeam.com/skills/<name>/SKILL.md`
+
+## Contributing
+
+Issues and pull requests are welcome here. An issue is the right place to start
+for a bug, a wrong doc, or a missing capability; say what you ran, what
+happened, what you expected, and which version you were on.
+
+Do not open a public issue for a suspected security vulnerability. Email
+security@pgbeam.com, or report it privately from this repository's Security
+tab.
+
+## License
+
+Apache 2.0. See [LICENSE](LICENSE).
