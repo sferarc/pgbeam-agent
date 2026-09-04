@@ -1,0 +1,24 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "pgbeam",
+  "version": "1.0.0",
+  "description": "Safe Postgres access for AI agents. Scoped credentials, read-only by default, table and column allowlists, PII masking, query budgets, a kill-switch, and a full audit trail, all enforced in the Postgres wire protocol.",
+  "author": {
+    "name": "PgBeam",
+    "url": "https://pgbeam.com"
+  },
+  "homepage": "https://pgbeam.com",
+  "repository": "https://github.com/sferarc/pgbeam-agent",
+  "license": "Apache-2.0",
+  "keywords": [
+    "postgres",
+    "postgresql",
+    "database",
+    "security",
+    "mcp",
+    "agent",
+    "audit",
+    "pii-masking",
+    "read-only"
+  ]
+}

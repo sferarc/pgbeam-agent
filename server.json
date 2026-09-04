@@ -1,0 +1,33 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.pgbeam/db-mcp",
+  "title": "PgBeam: Safe Postgres for AI agents",
+  "description": "Hosted, policy-enforced MCP server for safe, audited Postgres access by AI agents.",
+  "version": "1.0.0",
+  "websiteUrl": "https://pgbeam.com/docs/mcp",
+  "repository": {
+    "url": "https://github.com/sferarc/pgbeam-agent",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://{project}.proxy.pgbeam.app/mcp",
+      "variables": {
+        "project": {
+          "description": "Your PgBeam project subdomain, shown on the project's Connect page in the dashboard. Each agent credential connects on its own project-scoped host.",
+          "isRequired": true
+        }
+      },
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer token for a scoped agent credential (pba_...), minted once in the PgBeam dashboard. Scoped, revocable, and kill-switchable per credential.",
+          "isRequired": true,
+          "isSecret": true,
+          "default": "Bearer pba_YOUR_TOKEN"
+        }
+      ]
+    }
+  ]
+}
