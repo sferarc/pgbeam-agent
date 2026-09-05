@@ -25,18 +25,20 @@ Fastest path. Create a profile, set masking and access mode, and attach it:
 
 ```bash
 pgbeam policies create --name "Read-only analytics" \
-  --access-mode read_only \
-  --allow-table public.orders \
-  --allow-table public.customers \
+  --mode read_only \
+  --allow public.orders \
+  --allow public.customers \
   --mask customers.email=hash \
   --mask customers.ssn=redact \
   --mask customers.phone=null \
   --max-rows 10000
 
-# Attach as the project default, or to one credential:
-pgbeam projects update --default-policy-profile <pol_id>
-pgbeam agents create --name analytics --policy-profile <pol_id>
+# Attach to one credential, or set the project default for passthrough sessions:
+pgbeam agents create --name analytics --policy pol_1a2b3c
+pgbeam projects update --default-policy-profile-id pol_1a2b3c
 ```
+
+`--allow` and `--deny` are repeatable and also take a comma-separated list; `--table-allowlist` and `--table-denylist` take the whole list at once. `--file ./policy.json` supplies the full profile body (statement rules, row filters, everything), and individual flags overlay whatever the file set. `--dry-run` prints the resolved profile without calling the API, so you can diff a change before you make it.
 
 See `pgbeam policies --help` and https://pgbeam.com/docs/policies for the full flag set (row filters, budgets, timeouts, write mode).
 
@@ -77,6 +79,27 @@ resource "pgbeam_agent_credential" "analytics" {
 
 Set a project-wide floor with `default_policy_profile_id` on `pgbeam_project`, or scope per credential with `policy_profile_id` on `pgbeam_agent_credential`. The same profile shape is available through the TS SDK (`createPolicyProfile`) and the Go SDK. Import an existing profile with `terraform import pgbeam_policy_profile.analytics <project_id>/<id>`.
 
+## Prove the profile before you attach it
+
+Three checks, all offline against the data plane's own policy engine, none of which touch the upstream database. Run them in this order: they answer progressively harder questions.
+
+```bash
+# 1. Is the profile itself badly shaped?
+pgbeam policies lint --draft ./policy.json --strict
+
+# 2. What verdict would one statement get?
+pgbeam policies dry-eval --policy pol_1a2b3c --sql "SELECT email FROM users"
+
+# 3. What would change for traffic that already ran?
+pgbeam policies replay --draft ./policy.json --bound-policy pol_1a2b3c --json
+```
+
+`policies lint` reasons about the shape alone: read-write with no table allowlist, committing writes with no affected-row cap or approval, missing budgets, masking with no read ceiling, masking or row-filter rules on tables the policy has already made unreachable, write settings that are inert on a read-only profile, redundant allow and deny overlaps. `--strict` exits non-zero on any warning-or-worse finding, which makes it a CI gate.
+
+`policies dry-eval` prints the verdict (allow, block, mask, or row-filter) for one statement, with the rule and reason and any injected row-filter predicate. Stateful things a single-statement preview cannot model, per-region budgets, approvals, and write routing, come back as informational notes.
+
+`policies replay` runs the project's recorded audit traffic through the candidate and reports which previously-allowed queries would now be blocked, which blocked ones would now pass, and what would newly be masked or filtered. Pass `--bound-policy` to narrow it to the credentials the policy actually governs, which is the question you want before editing a live profile. Tightening a policy with `newly_blocked` at zero is a tightening nobody will notice.
+
 ## How to reason about a profile
 
 - **Deny by construction, not by hope.** An allowlist plus read-only means the agent cannot reach a table you did not name, so a prompt injection has a small blast radius by default.
@@ -86,6 +109,8 @@ Set a project-wide floor with `default_policy_profile_id` on `pgbeam_project`, o
 
 ## More
 
+- Reviewing what the policy actually did: the `pgbeam-audit` skill
+- Allowing writes safely: the `pgbeam-safe-migrations` skill
 - Policies: https://pgbeam.com/docs/policies
 - Masking: https://pgbeam.com/docs/masking
 - Row-level policies: https://pgbeam.com/docs/row-level-policies
