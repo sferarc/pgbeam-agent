@@ -1570,6 +1570,192 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /v1/organizations/{org_id}/members:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+    get:
+      operationId: listOrgMembers
+      summary: List organization members
+      description: Lists the people who belong to the organization, and their roles.
+      tags:
+        - Account
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: A page of members.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListOrgMembersResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /v1/organizations/{org_id}/members/{member_id}:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+      - $ref: '#/components/parameters/MemberId'
+    patch:
+      operationId: updateOrgMemberRole
+      summary: Change a member's role
+      description: >-
+        Changes what a member is allowed to do. An organization must keep at least one owner, so the last owner cannot
+        be demoted, and `owner` cannot be assigned here: ownership transfer is a separate, higher-privilege flow.
+      tags:
+        - Account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateOrgMemberRoleRequest'
+      responses:
+        '200':
+          description: The updated membership.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgMember'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    delete:
+      operationId: removeOrgMember
+      summary: Remove a member
+      description: >-
+        Removes someone from the organization. An organization must keep at least one owner, so the last remaining owner
+        cannot be removed and cannot be demoted either: transfer ownership first.
+      tags:
+        - Account
+      responses:
+        '204':
+          description: The member was removed.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /v1/organizations/{org_id}/invitations:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+    get:
+      operationId: listOrgInvitations
+      summary: List invitations
+      description: Lists invitations to join the organization and where each has got to.
+      tags:
+        - Account
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter to a single status. Omit to list every invitation.
+          schema:
+            type: string
+            enum:
+              - pending
+              - accepted
+              - rejected
+              - canceled
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+      responses:
+        '200':
+          description: A page of invitations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListOrgInvitationsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+    post:
+      operationId: createOrgInvitation
+      summary: Invite someone to the organization
+      description: >-
+        Creates an invitation and emails it. Inviting an address that already has a pending invitation returns a
+        conflict rather than a second invitation. `owner` cannot be invited: ownership transfer is a separate,
+        higher-privilege flow.
+      tags:
+        - Account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrgInvitationRequest'
+      responses:
+        '201':
+          description: The invitation was created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgInvitation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /v1/organizations/{org_id}/invitations/{invitation_id}:
+    parameters:
+      - $ref: '#/components/parameters/OrgId'
+      - $ref: '#/components/parameters/InvitationId'
+    delete:
+      operationId: revokeOrgInvitation
+      summary: Revoke an invitation
+      description: Cancels a pending invitation so it can no longer be accepted.
+      tags:
+        - Account
+      responses:
+        '204':
+          description: The invitation was revoked.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
   /v1/projects/{project_id}/migrations:lint:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -3143,6 +3329,29 @@ components:
         minLength: 1
         maxLength: 255
         example: a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d
+    MemberId:
+      name: member_id
+      in: path
+      required: true
+      description: >-
+        Unique organization membership identifier. Unlike the resources PgBeam mints itself, memberships carry no type
+        prefix: the id is opaque and is assigned when the membership row is created. Read it from `listOrgMembers`
+        rather than constructing it.
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9_.-]+$
+    InvitationId:
+      name: invitation_id
+      in: path
+      required: true
+      description: >-
+        Unique organization invitation identifier. Opaque, with no type prefix. Invitations created through this API are
+        32 lowercase hex characters; invitations created in the dashboard carry an id of a different shape, so treat it
+        as opaque and read it from `listOrgInvitations`.
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9_.-]+$
+        example: 9f3c1a7b2e4d6058b1c9d3f5a7e02468
   responses:
     BadRequest:
       description: Invalid request parameters.
@@ -5388,6 +5597,161 @@ components:
               type: string
               description: Human-readable error message.
           description: JSON-RPC error (present on failure).
+    OrgRole:
+      type: string
+      description: >-
+        A member's role within the organization. Roles are additive bundles of permissions; `owner` has every permission
+        including organization deletion and billing.
+      enum:
+        - owner
+        - admin
+        - member
+        - security_admin
+        - billing_admin
+        - auditor
+        - policy-author
+        - approver
+      example: admin
+    AssignableOrgRole:
+      type: string
+      description: >-
+        A role that can be assigned through the member API. This is `OrgRole` without `owner`: ownership is transferred
+        through a separate flow, so requesting it here is rejected with a 400.
+      enum:
+        - admin
+        - member
+        - security_admin
+        - billing_admin
+        - auditor
+        - policy-author
+        - approver
+      example: admin
+    OrgMember:
+      type: object
+      description: A user's membership of an organization.
+      required:
+        - id
+        - user_id
+        - email
+        - name
+        - role
+        - created_at
+      properties:
+        id:
+          type: string
+          description: Unique membership identifier. Opaque, with no type prefix. Pass it back as `member_id`.
+        user_id:
+          type: string
+          description: >-
+            The user this membership belongs to. Opaque, with no type prefix. One user has one membership per
+            organization, so this is stable across role changes while the membership lasts.
+        email:
+          type: string
+          description: The member's email address.
+          example: engineer@example.com
+        name:
+          type: string
+          description: The member's display name.
+          example: Alex Rivera
+        image:
+          type: string
+          description: URL of the member's avatar, when they have one.
+          example: https://example.com/avatars/alex.png
+        role:
+          $ref: '#/components/schemas/OrgRole'
+        created_at:
+          type: string
+          format: date-time
+          description: When the member joined the organization.
+          example: '2026-01-15T09:30:00Z'
+    ListOrgMembersResponse:
+      type: object
+      description: A page of organization members.
+      required:
+        - members
+      properties:
+        members:
+          type: array
+          description: Members of the organization.
+          items:
+            $ref: '#/components/schemas/OrgMember'
+        next_page_token:
+          type: string
+          description: Opaque token for cursor-based pagination.
+    UpdateOrgMemberRoleRequest:
+      type: object
+      description: Changes a member's role.
+      required:
+        - role
+      properties:
+        role:
+          $ref: '#/components/schemas/AssignableOrgRole'
+    OrgInvitation:
+      type: object
+      description: A pending invitation to join an organization.
+      required:
+        - id
+        - email
+        - role
+        - status
+        - expires_at
+        - created_at
+      properties:
+        id:
+          type: string
+          description: Unique invitation identifier. Opaque, with no type prefix. Pass it back as `invitation_id`.
+          example: 9f3c1a7b2e4d6058b1c9d3f5a7e02468
+        email:
+          type: string
+          description: Address the invitation was sent to.
+          example: engineer@example.com
+        role:
+          $ref: '#/components/schemas/OrgRole'
+        status:
+          type: string
+          description: Where the invitation has got to.
+          enum:
+            - pending
+            - accepted
+            - rejected
+            - canceled
+          example: pending
+        expires_at:
+          type: string
+          format: date-time
+          description: After this the invitation can no longer be accepted.
+          example: '2026-01-22T09:30:00Z'
+        created_at:
+          type: string
+          format: date-time
+          description: When the invitation was created.
+          example: '2026-01-15T09:30:00Z'
+    ListOrgInvitationsResponse:
+      type: object
+      description: A page of pending invitations.
+      required:
+        - invitations
+      properties:
+        invitations:
+          type: array
+          description: The organization's invitations.
+          items:
+            $ref: '#/components/schemas/OrgInvitation'
+        next_page_token:
+          type: string
+          description: Opaque token for cursor-based pagination.
+    CreateOrgInvitationRequest:
+      type: object
+      description: Invites someone to join the organization. Omitting `role` invites them as a `member`.
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          description: Address to invite.
+          example: engineer@example.com
+        role:
+          $ref: '#/components/schemas/AssignableOrgRole'
     MigrationLintRequest:
       type: object
       description: A migration script to lint for unsafe schema changes.
