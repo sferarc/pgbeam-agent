@@ -85,6 +85,9 @@ tags:
   - name: Support
     description: Support case management
     x-icon: LifeBuoy
+  - name: Batch
+    description: Apply many project-scoped operations in one request
+    x-icon: Layers
   - name: Internal
     description: Internal service-to-service endpoints
   - name: MCP
@@ -730,6 +733,73 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /v1/projects/{project_id}/batch:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: executeBatch
+      summary: Apply many project operations in one request
+      description: >-
+        Applies up to 100 project-scoped operations in a single request, so an agent acting on many resources does not
+        have to loop one call at a time. The loops this exists for are the ones the single-resource endpoints leave an
+        operator running by hand: revoking or disabling every agent credential during an incident, triaging a burst of
+        anomaly alerts, and importing the column descriptions for a whole schema.
+
+
+        The operation set is closed. A batch is not a tunnel for arbitrary requests; each kind it can perform is named
+        in the contract, carries its own permission, and is authorized independently against the caller's scope before
+        any of them runs, so a batch can never act outside the scope the caller already had. Every operation targets the
+        project in the path, and an id belonging to another project is reported exactly as a nonexistent one is, so this
+        cannot be used to probe for resources the caller cannot see.
+
+
+        `mode` is required and decides what a failure means. `atomic` runs the whole batch in one transaction: the first
+        runtime failure rolls it back, the response is 409, and every operation that did not itself fail is reported
+        `not_applied`. `independent` applies each operation on its own and answers 200 with a per-operation status, so a
+        caller can retry exactly the failures. Structural problems (an unknown operation kind, a missing field, a
+        duplicate target) are all found before any work happens and are answered with a single 400.
+
+
+        A batch costs the rate limiter one unit per operation, not one per HTTP request, so it is exactly as expensive
+        as the loop it replaces and cannot be used to sidestep the quota. When the remaining quota cannot cover the
+        whole batch the response is 429 and nothing runs, which is a better answer than a loop that discovers the same
+        thing halfway through. A batch refused this way still costs the one unit any request costs, so an oversized
+        batch is not a free way to probe the quota.
+      tags:
+        - Batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchRequest'
+      responses:
+        '200':
+          description: >-
+            The batch ran. In `independent` mode some operations may have failed; read `summary` and the per-operation
+            `status`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: >-
+            An atomic batch was rolled back. Nothing applied. The failing operations carry their error and every other
+            one is `not_applied`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
   /v1/plans:
@@ -4981,6 +5051,208 @@ components:
           type: string
           format: date-time
           description: When verification ran.
+    BatchRequest:
+      type: object
+      description: >
+        A set of project-scoped operations to apply in one request, together with the failure semantics the caller
+        wants. Every operation is authorized against the caller's scope before any of them runs, and a batch carrying an
+        operation the caller's role does not permit is refused whole with 403 rather than half-applied. Authorization
+        here is a property of the caller's role rather than a per-item runtime condition, so reporting it per item would
+        make "you may not do this" look like an ordinary item failure and would invite a caller to send a batch of
+        things it may not do to see which stick.
+      required:
+        - mode
+        - operations
+      properties:
+        mode:
+          type: string
+          enum:
+            - atomic
+            - independent
+          description: >
+            How the batch treats a failing operation. `atomic` applies all of them or none: the first runtime failure
+            rolls the whole batch back and the response is 409, so the status code alone never says a batch applied when
+            it did not. `independent` applies each operation on its own, so one failure stops nothing else and the
+            response is 200 with the outcome of each item. There is no default. An operator revoking fifty credentials
+            during an incident wants all fifty gone, an operator importing fifty column annotations wants the
+            forty-seven that parsed, and picking one of those for a caller who did not say would silently do the wrong
+            thing to the other.
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 100
+          description: >
+            The operations to apply, in order. At most 100 per request; a longer list is rejected with 400 and nothing
+            runs. Each entry must carry a distinct `id`, and no two entries may target the same resource.
+          items:
+            $ref: '#/components/schemas/BatchOperation'
+    BatchOperation:
+      type: object
+      description: >
+        One operation in a batch. `op` selects which of the per-operation fields below are read; any other field is
+        ignored. The set is closed on purpose: a batch is not a tunnel for arbitrary requests, so every operation it can
+        perform is named in this contract and carries its own permission check.
+      required:
+        - id
+        - op
+      properties:
+        id:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: >
+            Caller-assigned label, echoed on this operation's result so a caller can line results up with what it sent
+            without relying on array order. Must be unique within the request.
+          example: revoke-7
+        op:
+          type: string
+          enum:
+            - revoke_agent_credential
+            - set_agent_credential_status
+            - update_anomaly_alert
+            - put_schema_annotation
+          description: >
+            Which operation to apply. `revoke_agent_credential` and `set_agent_credential_status` read `agent_id` (the
+            latter also reads `agent_status`), `update_anomaly_alert` reads `anomaly_id` and `anomaly_status`, and
+            `put_schema_annotation` reads `annotation`.
+        agent_id:
+          type: string
+          description: >
+            Agent credential to act on, for `revoke_agent_credential` and `set_agent_credential_status`. Must belong to
+            the project in the path.
+          example: agt_01h455vb4pex5vsknk084sn02q
+        agent_status:
+          type: string
+          enum:
+            - active
+            - disabled
+          description: >
+            Kill-switch position to set, for `set_agent_credential_status`. Disabling drops the credential's live
+            connections within seconds. A revoked credential is gone for good, so setting either position on one fails
+            with `conflict` rather than resurrecting it.
+        anomaly_id:
+          type: string
+          description: |
+            Anomaly alert to triage, for `update_anomaly_alert`. Must belong to the project in the path.
+          example: ano_01h455vb4pex5vsknk084sn02q
+        anomaly_status:
+          type: string
+          enum:
+            - acknowledged
+            - resolved
+          description: New triage state for the alert, for `update_anomaly_alert`.
+        annotation:
+          $ref: '#/components/schemas/SchemaAnnotationInput'
+    BatchResponse:
+      type: object
+      description: >
+        The outcome of a batch. `results` carries one entry per requested operation in the order they were sent, and
+        `summary` is the same information counted so a caller can branch on one field instead of scanning. Results
+        deliberately do not carry the mutated resources: a batch reports what happened to each item, and a caller that
+        needs the resource reads it, which keeps the response size a function of the item count alone and keeps one
+        response shape for every operation kind.
+      required:
+        - mode
+        - applied
+        - summary
+        - results
+      properties:
+        mode:
+          type: string
+          enum:
+            - atomic
+            - independent
+          description: The failure semantics this batch ran under, echoed back.
+        applied:
+          type: boolean
+          description: >
+            Whether any of the batch's writes are in effect. False only for an atomic batch that rolled back, which is
+            also answered with 409.
+        summary:
+          $ref: '#/components/schemas/BatchSummary'
+        results:
+          type: array
+          description: One result per requested operation, in request order.
+          items:
+            $ref: '#/components/schemas/BatchOperationResult'
+    BatchSummary:
+      type: object
+      description: Counts of the per-operation outcomes in a batch.
+      required:
+        - requested
+        - succeeded
+        - failed
+        - not_applied
+      properties:
+        requested:
+          type: integer
+          description: How many operations the request carried.
+          example: 50
+        succeeded:
+          type: integer
+          description: How many operations applied. Always 0 for a rolled-back atomic batch.
+          example: 47
+        failed:
+          type: integer
+          description: How many operations failed. Retry exactly these.
+          example: 3
+        not_applied:
+          type: integer
+          description: >
+            How many operations were rolled back or never ran. Non-zero only for a rolled-back atomic batch, where every
+            operation that did not itself fail is reported this way.
+          example: 0
+    BatchOperationResult:
+      type: object
+      description: The outcome of one operation in a batch.
+      required:
+        - id
+        - op
+        - status
+      properties:
+        id:
+          type: string
+          description: The `id` the caller assigned to this operation.
+          example: revoke-7
+        op:
+          type: string
+          description: The operation kind that was requested, echoed back.
+          example: revoke_agent_credential
+        status:
+          type: string
+          enum:
+            - succeeded
+            - failed
+            - not_applied
+          description: >
+            Whether this operation applied. `not_applied` means the batch was atomic and rolled back, so this operation
+            left no trace whether or not it had run by the time the batch failed.
+        error:
+          $ref: '#/components/schemas/BatchOperationError'
+    BatchOperationError:
+      type: object
+      description: |
+        Why one operation in a batch failed. Present only on a failed result.
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - invalid_input
+            - not_found
+            - conflict
+            - internal
+          description: >
+            Machine-readable reason. `not_found` covers both a resource that does not exist and one that exists in
+            another project, so a batch cannot be used to probe for resources the caller cannot see. There is no
+            per-operation authorization code: a batch the caller's role does not fully permit is refused whole with 403
+            before anything runs.
+        message:
+          type: string
+          description: Human-readable reason, safe to surface to an operator.
+          example: agent credential not found
     OrganizationPlan:
       type: object
       description: Billing state and plan limits for an organization.
