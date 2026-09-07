@@ -77,6 +77,11 @@ tags:
   - name: Account
     description: Account data, privacy controls, and onboarding
     x-icon: CircleUser
+  - name: Demo
+    description: >-
+      Unauthenticated demo credentials against PgBeam's own read-only dataset, so an agent can run the policy engine
+      before it has an account.
+    x-icon: FlaskConical
   - name: Support
     description: Support case management
     x-icon: LifeBuoy
@@ -1295,6 +1300,122 @@ paths:
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /v1/demo:
+    get:
+      operationId: getDemo
+      summary: Describe the demo sandbox
+      description: >-
+        Returns everything an unauthenticated caller needs before asking for a demo credential: whether the demo is up,
+        how much of the global ceiling is left, what each tier costs, the dataset schema with the treatment the demo
+        policy applies to every column, and the walkthrough of statements that demonstrate each guardrail. Requires no
+        account and no key.
+      tags:
+        - Demo
+      security: []
+      responses:
+        '200':
+          description: The demo sandbox description.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemoInfo'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /v1/demo/credentials:
+    post:
+      operationId: createDemoCredential
+      summary: Issue a demo credential
+      description: >-
+        Issues a scoped, read-only, short-lived PostgreSQL credential plus a hosted MCP token against PgBeam's own demo
+        database, with no account and no key. The credential is governed by the same wire-protocol policy engine every
+        customer credential runs through, so a SELECT of a PII column comes back masked, a statement naming the table
+        left off the allowlist is blocked, and a write is refused, all with machine-readable reasons. The connection
+        string and MCP token are shown once. The response also carries the policy document that governed the demo, so a
+        caller who then opens an account can create the same policy on its own database verbatim.
+
+        Refusals are distinct on purpose. 429 means this client has asked for too many credentials in the last hour and
+        should wait. 503 with a Retry-After header means the global ceiling on concurrent demo credentials is full, so
+        backing off individually will not help; the header says when the oldest session expires. 503 also covers a
+        deployment with no demo database configured.
+      tags:
+        - Demo
+      security: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDemoCredentialRequest'
+      responses:
+        '201':
+          description: A working demo credential.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemoCredential'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '402':
+          description: >-
+            The requested tier is paid and no settled payment was presented. Settle the challenge and replay the request
+            with payment_proof set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemoPaymentChallenge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          description: >-
+            No credential can be issued right now: the global ceiling on live demo credentials is full (Retry-After says
+            when it frees up), the deployment has no demo database configured, or a paid tier was asked for on a
+            deployment with no payment method wired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/demo/credentials/{session_id}/release:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        description: The demo session to release, as returned when it was issued.
+        schema:
+          type: string
+    post:
+      operationId: releaseDemoCredential
+      summary: Release a demo credential
+      description: >-
+        Revokes a demo credential before its TTL runs out and returns its slot to the global ceiling. Callers that
+        finish early should do this so the next evaluating agent is not turned away by a session nobody is using. The
+        MCP token issued with the credential proves the caller holds it. Releasing an already-expired or
+        already-released session succeeds with released=false.
+      tags:
+        - Demo
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseDemoCredentialRequest'
+      responses:
+        '200':
+          description: The session was released, or was already gone.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DemoReleaseResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/projects/{project_id}/domains:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -3827,6 +3948,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    ServiceUnavailable:
+      description: Service temporarily unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     NotModified:
       description: The representation has not changed since the entity tag in `If-None-Match`. No body is sent.
       headers:
@@ -5670,6 +5797,418 @@ components:
         server_version:
           type: string
           description: PostgreSQL server version string, if available.
+    DemoTier:
+      type: object
+      description: >-
+        One purchasable (or free) grade of demo credential. The free tier is always listed; a paid tier is listed with
+        purchasable=false until a payment method is wired into the deployment.
+      required:
+        - name
+        - ttl_seconds
+        - query_budget
+        - max_rows
+        - price_usd_cents
+        - purchasable
+      properties:
+        name:
+          type: string
+          enum:
+            - free
+            - extended
+          description: Tier identifier, used as the tier field of a vend request.
+        ttl_seconds:
+          type: integer
+          description: How long a credential of this tier stays usable after it is issued.
+        query_budget:
+          type: integer
+          description: >-
+            Statements the credential may run before the data plane refuses it. The unit charged is the statement, not
+            the protocol message.
+        max_rows:
+          type: integer
+          description: Rows a single statement may return before the result is truncated.
+        price_usd_cents:
+          type: integer
+          description: Price of one credential of this tier, in US cents. 0 for the free tier.
+        purchasable:
+          type: boolean
+          description: >-
+            Whether this tier can be bought right now. False means the deployment has no payment method wired, so a
+            request for the tier is refused with 503 rather than a 402 challenge nobody can settle.
+        resource:
+          type: string
+          description: Payment catalog resource id for this tier, quoted back in the 402 challenge. Absent on the free tier.
+          example: pgbeam.demo.credential.extended
+    DemoColumn:
+      type: object
+      description: One column of a demo table, and how the demo policy treats it.
+      required:
+        - name
+        - type
+        - treatment
+      properties:
+        name:
+          type: string
+          description: Column name.
+        type:
+          type: string
+          description: PostgreSQL type.
+        treatment:
+          type: string
+          enum:
+            - visible
+            - redacted
+            - hashed
+            - nulled
+          description: >-
+            What a demo credential sees. visible is the raw value; redacted returns a fixed token; hashed returns a
+            SHA-256 hex digest; nulled returns NULL.
+    DemoTable:
+      type: object
+      description: One table in the demo dataset, and whether the demo policy reaches it.
+      required:
+        - name
+        - reachable
+        - description
+        - columns
+      properties:
+        name:
+          type: string
+          description: Schema-qualified relation name.
+          example: demo.customers
+        reachable:
+          type: boolean
+          description: >-
+            False for a table that exists in the database but is deliberately left off the credential's allowlist, so
+            every statement naming it is blocked.
+        description:
+          type: string
+          description: What the table holds and which guardrail it demonstrates.
+        columns:
+          type: array
+          description: Columns of the table, with the treatment the demo policy applies.
+          items:
+            $ref: '#/components/schemas/DemoColumn'
+    DemoWalkthroughStep:
+      type: object
+      description: >-
+        One statement an agent can run to observe a specific enforcement decision, with the outcome it must produce.
+        Running all of them, in order, is the machine-checkable proof that the policy engine is live.
+      required:
+        - step
+        - title
+        - sql
+        - expect
+        - why
+      properties:
+        step:
+          type: integer
+          description: Position in the walkthrough, starting at 1.
+        title:
+          type: string
+          description: Short name for what this step demonstrates.
+        sql:
+          type: string
+          description: The exact statement to run. Relations are schema-qualified on purpose.
+        expect:
+          type: string
+          enum:
+            - allow
+            - masked
+            - blocked
+          description: >-
+            The outcome the statement must produce. allow returns rows unchanged; masked returns rows with the listed
+            columns replaced; blocked returns a PostgreSQL error rather than rows.
+        expect_rule:
+          type: string
+          description: The decision rule named in the error, for a blocked step. Present only when expect is blocked.
+          example: table_not_allowed
+        expect_columns:
+          type: array
+          description: Output columns that come back masked, for a masked step. Present only when expect is masked.
+          items:
+            $ref: '#/components/schemas/DemoColumn'
+        why:
+          type: string
+          description: The policy rule that produces this outcome, in one sentence.
+    DemoDataset:
+      type: object
+      description: >-
+        The fictional dataset a demo credential reads. It is owned by PgBeam, shared by every concurrent demo, and
+        read-only, so no session can change what another session sees.
+      required:
+        - schema
+        - tables
+      properties:
+        schema:
+          type: string
+          description: PostgreSQL schema holding the demo tables.
+          example: demo
+        tables:
+          type: array
+          description: Tables in the dataset.
+          items:
+            $ref: '#/components/schemas/DemoTable'
+    DemoUpgrade:
+      type: object
+      description: >-
+        What to do with the demo once it has proved the point. The policy that governed the demo is handed back as a
+        document that can be posted verbatim to the real policy endpoint, so the evaluation carries into the account.
+      required:
+        - signup_url
+        - docs_url
+        - policy_endpoint
+        - description
+      properties:
+        signup_url:
+          type: string
+          description: >-
+            Dashboard signup, carrying the demo session id so the resulting organization can be attributed to this
+            evaluation.
+        docs_url:
+          type: string
+          description: Documentation for this endpoint and the walkthrough.
+        policy_endpoint:
+          type: string
+          description: The authenticated endpoint that accepts policy_template as its request body once the caller has a project.
+          example: POST /v1/projects/{project_id}/policies
+        description:
+          type: string
+          description: How to carry the demo policy into a real project, in one sentence.
+    DemoInfo:
+      type: object
+      description: >-
+        Everything an unauthenticated caller needs to decide whether to ask for a demo credential: whether the demo is
+        up, how much capacity is left, what the tiers cost, what the dataset holds, and the walkthrough to run.
+      required:
+        - available
+        - tiers
+        - dataset
+        - walkthrough
+        - live_sessions
+        - max_live_sessions
+        - max_sessions_per_hour_per_client
+        - upgrade
+      properties:
+        available:
+          type: boolean
+          description: >-
+            Whether a credential can be issued right now. False when the deployment has no demo database configured or
+            the global ceiling is full.
+        unavailable_reason:
+          type: string
+          description: Why no credential can be issued. Present only when available is false.
+          example: not_configured
+        retry_after_seconds:
+          type: integer
+          description: Seconds until the oldest live session expires and capacity frees up. Present only when the ceiling is full.
+        tiers:
+          type: array
+          description: Grades of demo credential this deployment offers.
+          items:
+            $ref: '#/components/schemas/DemoTier'
+        dataset:
+          $ref: '#/components/schemas/DemoDataset'
+        walkthrough:
+          type: array
+          description: Statements to run, in order, to observe each guardrail.
+          items:
+            $ref: '#/components/schemas/DemoWalkthroughStep'
+        live_sessions:
+          type: integer
+          description: Demo credentials currently issued and unexpired.
+        max_live_sessions:
+          type: integer
+          description: Hard ceiling on concurrent live demo credentials across the whole deployment. Vending stops at this number.
+        max_sessions_per_hour_per_client:
+          type: integer
+          description: >-
+            Credentials one client address may be issued per rolling hour. Counted against a keyed hash of the address,
+            never the address itself.
+        upgrade:
+          $ref: '#/components/schemas/DemoUpgrade'
+    CreateDemoCredentialRequest:
+      type: object
+      description: >-
+        Optional shaping of the demo credential. An empty body issues a free-tier credential, which is the intended path
+        for an agent evaluating the product.
+      properties:
+        tier:
+          type: string
+          enum:
+            - free
+            - extended
+          default: free
+          description: >-
+            Which tier to issue. A paid tier is refused with 402 until payment is settled, and with 503 when the
+            deployment has no payment method wired.
+        label:
+          type: string
+          maxLength: 64
+          description: >-
+            A name for the caller, recorded on the session and on every audit row the credential produces. Free text; no
+            identity is inferred from it.
+          example: eval-agent
+        payment_proof:
+          type: string
+          maxLength: 8192
+          description: >-
+            Settlement material for a paid tier, as issued by the payment challenge returned from a previous 402.
+            Ignored on the free tier.
+    DemoPaymentMethod:
+      type: object
+      description: One payment method the 402 challenge will accept for a paid tier.
+      required:
+        - scheme
+        - network
+        - amount
+        - currency
+        - pay_to
+      properties:
+        scheme:
+          type: string
+          description: Payment scheme identifier.
+          example: exact
+        network:
+          type: string
+          description: Settlement network the payment must land on.
+          example: base
+        asset:
+          type: string
+          description: Asset contract or symbol the amount is denominated in.
+        amount:
+          type: string
+          description: Amount owed, as a decimal string in the asset's smallest unit, so no precision is lost in JSON.
+          example: '1000000'
+        currency:
+          type: string
+          description: Human-facing currency code for the amount.
+          example: USDC
+        pay_to:
+          type: string
+          description: Address or account the payment must be made to.
+        max_timeout_seconds:
+          type: integer
+          description: How long the challenge stays settleable.
+    DemoPaymentChallenge:
+      type: object
+      description: >-
+        The 402 body for a paid demo tier: what is being sold, and how to pay for it. Settle it and replay the request
+        with payment_proof set.
+      required:
+        - resource
+        - tier
+        - reason
+        - accepts
+      properties:
+        resource:
+          type: string
+          description: Payment catalog resource id being charged for.
+          example: pgbeam.demo.credential.extended
+        tier:
+          type: string
+          description: The demo tier this challenge would issue.
+        reason:
+          type: string
+          description: Why payment is required, in one sentence.
+        accepts:
+          type: array
+          description: Payment methods that will settle this challenge.
+          items:
+            $ref: '#/components/schemas/DemoPaymentMethod'
+    DemoCredential:
+      type: object
+      description: >-
+        A working, scoped, read-only demo credential against PgBeam's own database, plus everything needed to use it and
+        to reproduce its policy on a real project. The connection string and MCP token are shown once and are not
+        retrievable again.
+      required:
+        - session_id
+        - tier
+        - connection_string
+        - mcp_url
+        - mcp_token
+        - expires_at
+        - ttl_seconds
+        - query_budget
+        - dataset
+        - walkthrough
+        - policy_template
+        - upgrade
+      properties:
+        session_id:
+          type: string
+          description: >-
+            Identifier for this demo session. Quote it when releasing the credential, and it is carried on the signup
+            link.
+          example: dmo_01h455vb4pex5vsknk084sn02q
+        tier:
+          type: string
+          description: Tier that was issued.
+        connection_string:
+          type: string
+          description: >-
+            Guarded PostgreSQL connection string. TLS is mandatory and SNI selects the project, so the host must not be
+            replaced with an IP address.
+        mcp_url:
+          type: string
+          description: Hosted MCP endpoint for the same guarded database.
+        mcp_token:
+          type: string
+          description: Bearer token for the MCP endpoint. Shown once.
+        expires_at:
+          type: string
+          format: date-time
+          description: >-
+            When the credential stops working. Past this instant the proxy refuses new connections and terminates live
+            sessions.
+        ttl_seconds:
+          type: integer
+          description: Seconds from issue to expiry.
+        query_budget:
+          type: integer
+          description: Statements this credential may run before it is refused.
+        dataset:
+          $ref: '#/components/schemas/DemoDataset'
+        walkthrough:
+          type: array
+          description: Statements to run, in order, to observe each guardrail.
+          items:
+            $ref: '#/components/schemas/DemoWalkthroughStep'
+        policy_template:
+          $ref: '#/components/schemas/PolicyProfileInput'
+        upgrade:
+          $ref: '#/components/schemas/DemoUpgrade'
+    ReleaseDemoCredentialRequest:
+      type: object
+      description: >-
+        Release of a demo credential by its holder. The MCP token proves the caller is the one that was issued the
+        session.
+      required:
+        - mcp_token
+      properties:
+        mcp_token:
+          type: string
+          description: The mcp_token returned when the credential was issued.
+    DemoReleaseResult:
+      type: object
+      description: Outcome of releasing a demo credential.
+      required:
+        - session_id
+        - released
+        - live_sessions
+      properties:
+        session_id:
+          type: string
+          description: The session that was released.
+        released:
+          type: boolean
+          description: >-
+            True when this call released the session. False when it had already expired or been released, which is not
+            an error.
+        live_sessions:
+          type: integer
+          description: Demo credentials still live after this release.
     CustomDomain:
       type: object
       description: Custom database hostname attached to a project.
