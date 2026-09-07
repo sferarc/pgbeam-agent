@@ -42,7 +42,7 @@ The [`pgbeam-connect`](skills/pgbeam-connect/SKILL.md) skill walks an agent thro
 
 ## Elsewhere
 
-The client libraries and providers have their own repositories: [pgbeam-js](https://github.com/sferarc/pgbeam-js) (TypeScript SDK), [pgbeam-go](https://github.com/sferarc/pgbeam-go) (Go SDK), [pgbeam-cli](https://github.com/sferarc/pgbeam-cli), [pgbeam-terraform](https://github.com/sferarc/pgbeam-terraform), [pgbeam-pulumi](https://github.com/sferarc/pgbeam-pulumi), [pgbeam-crossplane](https://github.com/sferarc/pgbeam-crossplane), and [pgbeam-docs](https://github.com/sferarc/pgbeam-docs).
+The client libraries and providers have their own repositories: [pgbeam-js](https://github.com/sferarc/pgbeam-js) (TypeScript SDK), [pgbeam-go](https://github.com/sferarc/pgbeam-go) (Go SDK), [pgbeam-cli](https://github.com/sferarc/pgbeam-cli), [terraform-provider-pgbeam](https://github.com/sferarc/terraform-provider-pgbeam), [pgbeam-pulumi](https://github.com/sferarc/pgbeam-pulumi), [pgbeam-crossplane](https://github.com/sferarc/pgbeam-crossplane), and [pgbeam-docs](https://github.com/sferarc/pgbeam-docs).
 
 ## Contributing
 
