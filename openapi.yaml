@@ -97,13 +97,22 @@ paths:
         portability and CCPA right to know. Audit logs are limited to the most recent 1000 entries.
       tags:
         - Account
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Account data export.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AccountExport'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -163,13 +172,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of agent credentials.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListAgentCredentialsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -191,13 +206,20 @@ paths:
       description: Returns a single agent credential. Secrets are never included.
       tags:
         - Agents
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: The agent credential (no secrets).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentCredential'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -217,6 +239,8 @@ paths:
         credential instead.
       tags:
         - Agents
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -240,6 +264,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
     delete:
       operationId: revokeAgentCredential
       x-feature-flag: agent-gateway
@@ -360,13 +386,19 @@ paths:
               - resolved
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Page of anomaly alerts.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListAnomalyAlertsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -435,13 +467,19 @@ paths:
               - failed
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Page of approval requests.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListApprovalRequestsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -547,13 +585,19 @@ paths:
             type: string
             format: date-time
         - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Page of audit entries.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListAuditLogsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -620,13 +664,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/AuditStart'
         - $ref: '#/components/parameters/AuditEnd'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Session summary.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuditSessionSummary'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -654,13 +704,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/AuditStart'
         - $ref: '#/components/parameters/AuditEnd'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Chain verification result.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuditChainVerification'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -678,16 +734,25 @@ paths:
       description: Returns all available plan tiers with their limits and pricing.
       tags:
         - Analytics
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       security:
         - BearerAuth: []
         - ApiKeyAuth: []
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of available plans.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListPlansResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -704,13 +769,19 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Organization plan details.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrganizationPlan'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -735,13 +806,19 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Vercel installation status.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/VercelInstallationStatus'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -840,13 +917,19 @@ paths:
               - discarded
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Page of sandbox branches.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListDatabaseBranchesResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -894,13 +977,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Cache rule entries.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListCacheRulesResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1000,13 +1089,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of databases.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListDatabasesResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1027,13 +1122,20 @@ paths:
       description: Returns a single database by ID.
       tags:
         - Databases
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Database found.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Database'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1050,6 +1152,8 @@ paths:
       description: Partially updates a database connection. Only provided fields are modified.
       tags:
         - Databases
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1071,6 +1175,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
         '429':
           $ref: '#/components/responses/TooManyRequests'
     delete:
@@ -1165,13 +1271,20 @@ paths:
         per-column is_binary flag flags columns that mask to NULL. System schemas are excluded; nothing is persisted.
       tags:
         - Databases
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Schema catalog.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SchemaCatalog'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1235,13 +1348,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of custom domains.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListCustomDomainsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1317,14 +1436,23 @@ paths:
       description: Returns the health status of the API server.
       tags:
         - Platform
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       security: []
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Service is healthy.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '429':
           $ref: '#/components/responses/TooManyRequests'
   /v1/projects/{project_id}/honeytokens:
@@ -1374,13 +1502,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of honeytokens.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListHoneytokensResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1401,13 +1535,20 @@ paths:
       description: Returns a single honeytoken by ID.
       tags:
         - Honeytokens
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: The honeytoken.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Honeytoken'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1422,6 +1563,8 @@ paths:
       description: Updates a honeytoken's relation or action.
       tags:
         - Honeytokens
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1443,6 +1586,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
     delete:
       operationId: deleteHoneytoken
       summary: Delete a honeytoken
@@ -1496,13 +1641,19 @@ paths:
             default: 20
             minimum: 1
             maximum: 100
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Query insights for the project.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectInsights'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1590,13 +1741,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: A page of members.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListOrgMembersResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1690,13 +1847,19 @@ paths:
               - canceled
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: A page of invitations.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListOrgInvitationsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1804,13 +1967,20 @@ paths:
       description: Returns the onboarding checklist progress for an organization.
       tags:
         - Account
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Onboarding progress.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OnboardingProgress'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1860,13 +2030,22 @@ paths:
         returns the organizations the user is a member of, including the caller's role in each.
       tags:
         - Account
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Organizations visible to the caller.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListOrganizationsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -1918,13 +2097,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of policy profiles.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListPolicyProfilesResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1946,13 +2131,20 @@ paths:
       description: Returns a single policy profile by ID.
       tags:
         - Policies
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: The policy profile.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PolicyProfile'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1968,6 +2160,8 @@ paths:
       description: Updates a policy profile. Changes hot-reload to active agent sessions.
       tags:
         - Policies
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -1989,6 +2183,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
         '429':
           $ref: '#/components/responses/TooManyRequests'
     delete:
@@ -2156,13 +2352,19 @@ paths:
               - active_connections
             default: created_at
             example: created_at
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of projects.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListProjectsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2180,13 +2382,20 @@ paths:
       description: Returns a single project by ID.
       tags:
         - Projects
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Project found.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Project'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2203,6 +2412,8 @@ paths:
       description: Partially updates a project. Only provided fields are modified.
       tags:
         - Projects
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -2224,6 +2435,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
         '429':
           $ref: '#/components/responses/TooManyRequests'
     delete:
@@ -2273,13 +2486,19 @@ paths:
           schema:
             type: string
             example: us-east-1
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Metrics snapshots
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectMetricsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2295,13 +2514,22 @@ paths:
       description: Returns all active data plane regions.
       tags:
         - Platform
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of regions.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListRegionsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -2315,13 +2543,20 @@ paths:
       description: Lists all read replicas for a database.
       tags:
         - Projects
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of replicas.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListReplicasResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2402,13 +2637,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of schema annotations.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListSchemaAnnotationsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2538,13 +2779,20 @@ paths:
       description: Lists an organization's self-host enrollments. Tokens are never returned.
       tags:
         - Platform
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of enrollments.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListSelfHostEnrollmentsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2664,13 +2912,19 @@ paths:
             type: integer
             minimum: 1
             default: 1
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of support cases.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListSupportCasesResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2716,13 +2970,20 @@ paths:
       description: Returns a support case with all its messages.
       tags:
         - Support
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Support case with messages.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/GetSupportCaseResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2845,13 +3106,19 @@ paths:
             format: date
             example: '2024-01-31'
           description: End date (inclusive, YYYY-MM-DD).
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Daily usage data.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/UsageResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2888,13 +3155,19 @@ paths:
             format: date
             example: '2024-01-31'
           description: End date (inclusive, YYYY-MM-DD).
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Daily usage data by region.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectUsageResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -2946,13 +3219,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/AuditStart'
         - $ref: '#/components/parameters/AuditEnd'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: Per-agent usage for the window.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AgentUsageReport'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3010,13 +3289,19 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: List of webhook endpoints.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ListWebhookEndpointsResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3038,13 +3323,20 @@ paths:
       description: Returns a single webhook endpoint by ID.
       tags:
         - Webhooks
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
           description: The webhook endpoint.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/WebhookEndpoint'
+        '304':
+          $ref: '#/components/responses/NotModified'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3060,6 +3352,8 @@ paths:
       description: Updates a webhook endpoint.
       tags:
         - Webhooks
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
       requestBody:
         required: true
         content:
@@ -3081,6 +3375,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
     delete:
       operationId: deleteWebhookEndpoint
       x-feature-flag: agent-gateway
@@ -3207,6 +3503,15 @@ x-webhooks:
         '200':
           description: The delivery was accepted. Any 2xx will do; the body is ignored.
 components:
+  headers:
+    ETag:
+      description: >-
+        Entity tag for the representation in this response. Send it back in `If-None-Match` on a later read to be told
+        `304 Not Modified` when nothing has changed, or in `If-Match` on a write to have that write refused if the
+        resource changed in the meantime.
+      schema:
+        type: string
+        example: '"9f8a1c2b3d4e5f60a1b2c3d4e5f60718"'
   parameters:
     OrgId:
       name: org_id
@@ -3390,6 +3695,44 @@ components:
       schema:
         type: string
         format: date-time
+    IfNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: >-
+        Entity tag the client already holds, taken from the `ETag` of an earlier response. When it still matches the
+        current representation the server answers `304 Not Modified` with no body, so a poll that finds nothing changed
+        costs a round trip rather than a transfer.
+
+
+        A comma-separated list is accepted, and `*` matches any current representation.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 1024
+        example: '"9f8a1c2b3d4e5f60a1b2c3d4e5f60718"'
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: >-
+        Entity tag the write is based on, taken from the `ETag` of the read that produced the values being sent. The
+        write proceeds only if it still matches the current representation; otherwise it is refused with `412
+        Precondition Failed` and nothing is changed.
+
+
+        This is what makes a read-modify-write safe. Without it the last writer wins and a concurrent edit is silently
+        discarded, which is the failure an agent is most likely to cause and least likely to notice. The `412` response
+        carries the current `ETag`, so a caller can re-read, re-apply its change and retry.
+
+
+        Omitting the header keeps the old unconditional behaviour. `*` matches any current representation, which asserts
+        only that the resource exists.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 1024
+        example: '"9f8a1c2b3d4e5f60a1b2c3d4e5f60718"'
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -3480,6 +3823,27 @@ components:
           schema:
             type: integer
             example: 60
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotModified:
+      description: The representation has not changed since the entity tag in `If-None-Match`. No body is sent.
+      headers:
+        ETag:
+          description: Entity tag of the unchanged representation.
+          schema:
+            type: string
+    PreconditionFailed:
+      description: >-
+        The `If-Match` entity tag does not match the current representation, so the resource changed after the read this
+        write was based on. Nothing was modified. `code` is `PRECONDITION_FAILED`. Re-read the resource, re-apply the
+        change, and retry with the new tag.
+      headers:
+        ETag:
+          description: Entity tag of the current representation.
+          schema:
+            type: string
       content:
         application/json:
           schema:
