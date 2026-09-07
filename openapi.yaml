@@ -2731,10 +2731,12 @@ paths:
     get:
       operationId: listReplicas
       summary: List replicas
-      description: Lists all read replicas for a database.
+      description: Lists a database's read replicas.
       tags:
         - Projects
       parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
         - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
@@ -2971,6 +2973,8 @@ paths:
       tags:
         - Platform
       parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
         - $ref: '#/components/parameters/IfNoneMatch'
       responses:
         '200':
@@ -8665,6 +8669,9 @@ components:
           description: The organization's self-host enrollments, newest first.
           items:
             $ref: '#/components/schemas/SelfHostEnrollment'
+        next_page_token:
+          type: string
+          description: Opaque token for cursor-based pagination.
     SupportCase:
       type: object
       description: A support case filed by an organization member.
