@@ -68,6 +68,9 @@ tags:
   - name: Migrations
     description: Migration safety linting for schema changes
     x-icon: FileCog
+  - name: Payments
+    description: 'Machine Payments Protocol (HTTP 402): priced resources an agent can buy on its own, with no human in the loop.'
+    x-icon: CreditCard
   - name: Analytics
     description: Usage metrics, billing data, and query insights
     x-icon: ChartLine
@@ -1779,6 +1782,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
     delete:
@@ -2243,6 +2248,141 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+  /v1/payments/resources:
+    get:
+      operationId: listPaymentResources
+      summary: List priced resources
+      description: |
+        Lists what an agent can buy over the Machine Payments Protocol, with the
+        unit, the pack size, and the price of one pack. Discovery only: the
+        `WWW-Authenticate: Payment` challenge returned by a priced operation is
+        always authoritative.
+
+        This endpoint takes no authentication so an agent can read the price
+        before it holds a credential.
+      tags:
+        - Payments
+      security: []
+      responses:
+        '200':
+          description: The priced resource catalog.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListPaymentResourcesResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/payments/budget-topups:
+    post:
+      operationId: createBudgetTopup
+      summary: Buy query budget for an agent credential
+      description: |
+        Buys additional queries for the agent credential this request is
+        authenticated as, using the Machine Payments Protocol (HTTP 402 with the
+        `Payment` authentication scheme).
+
+        Authenticate with the credential's hosted MCP token (`pba_...`) as a
+        bearer token. The credential identifies itself, so no human and no
+        dashboard session is involved.
+
+        Without a payment credential the response is `402` carrying a complete
+        `WWW-Authenticate: Payment` challenge. Fulfil it, then repeat the request
+        with the credential in the `Payment-Authorization` header (the challenge
+        selects that field so the bearer token can stay in `Authorization`). On
+        success the queries are granted, streamed to the data planes, and the
+        response carries a `Payment-Receipt` header.
+
+        Purchased queries do not raise the credential's policy budget. They are a
+        separate pool the proxy spends only once the policy's hourly and daily
+        windows have refused a statement, and they expire.
+      tags:
+        - Payments
+      x-payment-info:
+        offers:
+          - intent: charge
+            method: stripe
+            amount: '200'
+            currency: usd
+            description: 1000 queries per pack; buy 1 to 25 packs per payment.
+      parameters:
+        - name: Payment-Authorization
+          in: header
+          required: false
+          description: |
+            The MPP payment credential, `Payment <base64url>`, echoing the
+            challenge from the `402` and carrying the method-specific proof. For
+            the `stripe` method the payload is `{"spt": "spt_..."}`, a single-use
+            Shared Payment Token.
+          schema:
+            type: string
+        - name: Accept-Payment
+          in: header
+          required: false
+          description: |
+            Payment method and intent preferences, for example `stripe/charge`.
+            Ignored when it matches nothing this endpoint offers.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetTopupInput'
+      responses:
+        '201':
+          description: |
+            Payment settled and queries granted. The `Payment-Receipt` header
+            carries the base64url receipt.
+          headers:
+            Payment-Receipt:
+              description: Base64url-encoded settlement receipt.
+              schema:
+                type: string
+            Cache-Control:
+              description: Always `private`, so no shared cache stores the receipt.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetTopup'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: |
+            Payment required. The `WWW-Authenticate` header carries a complete
+            `Payment` challenge and the body carries RFC 9457 problem details
+            explaining why. A failed or replayed credential also answers `402`
+            with a fresh challenge, never `401`.
+          headers:
+            WWW-Authenticate:
+              description: |
+                The `Payment` challenge: `id`, `realm`, `method`, `intent`,
+                `header`, `expires`, `description` and `opaque` auth-params plus
+                the base64url `request`.
+              schema:
+                type: string
+            Cache-Control:
+              description: Always `no-store`, so no cache reuses a challenge.
+              schema:
+                type: string
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/PaymentProblem'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/projects/{project_id}/policies:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -2628,6 +2768,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
         '429':
@@ -7260,6 +7402,164 @@ components:
           description: Organizations the caller can access.
           items:
             $ref: '#/components/schemas/OrganizationSummary'
+    PaymentResource:
+      type: object
+      description: One thing an agent can buy over the Machine Payments Protocol.
+      required:
+        - id
+        - title
+        - unit
+        - units_per_pack
+        - currency
+        - amount_per_pack
+        - min_packs
+        - max_packs
+      properties:
+        id:
+          type: string
+          description: Stable resource identifier, carried in the payment challenge.
+          example: query_budget_topup
+        title:
+          type: string
+          description: Short human-readable name for the resource.
+          example: Query budget top-up
+        description:
+          type: string
+          description: What buying this resource gets you, and how it is spent.
+        unit:
+          type: string
+          description: What one unit is.
+          example: queries
+        units_per_pack:
+          type: integer
+          format: int64
+          description: Units contained in one purchasable pack.
+          example: 1000
+        currency:
+          type: string
+          description: ISO 4217 code, lowercase.
+          example: usd
+        amount_per_pack:
+          type: integer
+          format: int64
+          description: Price of one pack in the smallest unit of the currency.
+          example: 200
+        min_packs:
+          type: integer
+          format: int64
+          description: Fewest packs one payment may buy.
+          example: 1
+        max_packs:
+          type: integer
+          format: int64
+          description: Most packs one payment may buy.
+          example: 25
+        operation_id:
+          type: string
+          description: OpenAPI operation that sells this resource.
+          example: createBudgetTopup
+    ListPaymentResourcesResponse:
+      type: object
+      description: Everything this deployment sells over the Machine Payments Protocol.
+      required:
+        - resources
+      properties:
+        resources:
+          type: array
+          description: The priced resources, in catalog order.
+          items:
+            $ref: '#/components/schemas/PaymentResource'
+    BudgetTopupInput:
+      type: object
+      description: |
+        How much query budget to buy for the agent credential the request is
+        authenticated as.
+      properties:
+        packs:
+          type: integer
+          format: int64
+          default: 1
+          minimum: 1
+          description: |
+            Packs of query budget to buy. One pack is `units_per_pack` queries at
+            `amount_per_pack`, both readable from `GET /v1/payments/resources`.
+          example: 1
+    BudgetTopup:
+      type: object
+      description: Purchased query headroom, already granted and streamed to the data planes.
+      required:
+        - grant_id
+        - credential_id
+        - queries
+        - expires_at
+        - amount
+        - currency
+      properties:
+        grant_id:
+          type: string
+          description: Identifier of the budget grant this payment created.
+          example: bgt_9f2c1d4e6a8b
+        credential_id:
+          type: string
+          description: Agent credential the queries were granted to.
+          example: agt_01hxyz
+        queries:
+          type: integer
+          format: int64
+          description: Queries granted.
+          example: 1000
+        expires_at:
+          type: string
+          format: date-time
+          description: When the unspent remainder stops being spendable.
+        amount:
+          type: integer
+          format: int64
+          description: Amount charged, in the smallest unit of the currency.
+          example: 200
+        currency:
+          type: string
+          description: ISO 4217 code, lowercase.
+          example: usd
+        payment_reference:
+          type: string
+          description: Processor reference for the charge (a Stripe PaymentIntent id).
+          example: pi_3PabcDEF0123456789
+        receipt:
+          type: string
+          description: |
+            The `Payment-Receipt` header value, repeated in the body for clients that
+            cannot read response headers.
+    PaymentProblem:
+      type: object
+      description: |
+        RFC 9457 Problem Details for a payment failure. MPP puts the reason in the
+        body and the challenge in the `WWW-Authenticate` header, so a 402 carries
+        both.
+      required:
+        - type
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          format: uri
+          description: Problem type URI, from the MPP problem registry.
+          example: https://paymentauth.org/problems/payment-required
+        title:
+          type: string
+          description: Short human-readable summary of the problem type.
+          example: Payment Required
+        status:
+          type: integer
+          description: HTTP status code, repeated for clients that read only the body.
+          example: 402
+        detail:
+          type: string
+          description: Human-readable explanation of this particular occurrence.
+        challengeId:
+          type: string
+          description: Identifier of the challenge this problem refers to.
     PiiSuggestion:
       type: object
       description: >-
