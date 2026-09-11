@@ -8278,6 +8278,30 @@ components:
             Hard cap on rows a single write (INSERT/UPDATE/DELETE) may affect. A write whose affected-row count would
             exceed this is executed inside a transaction, checked, and rolled back so nothing persists, then blocked.
             Enforced independently of human approval. 0 means unlimited.
+        content_scan_mode:
+          type: string
+          enum:
+            - 'off'
+            - annotate
+            - block
+          default: 'off'
+          description: >-
+            Result-content scanning, accepted and stored but not yet enforced: no released proxy build reads this field,
+            so today every value behaves like off. Once enforcement ships on the data-plane relay path, values on their
+            way out to an agent will be checked for instruction-shaped content (stored prompt injection). off will scan
+            nothing and cost nothing. annotate will forward every value unchanged and record what it found. block will
+            additionally refuse the statement with an error naming the column, and never drop a row silently. A proxy
+            build without result-content scanning ignores this field.
+        content_scan_max_bytes:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 0
+          description: >-
+            Byte budget for one statement's content scan, spanning all values in the result. Stored but not yet read by
+            any released proxy build, like content_scan_mode. Once enforced, values past it are reported unscannable
+            rather than skipped quietly. 0 uses the scanner default (4 MiB), which covers an interactive result set and
+            deliberately does not cover a bulk export.
         created_at:
           type: string
           format: date-time
@@ -8399,6 +8423,30 @@ components:
             Hard cap on rows a single write (INSERT/UPDATE/DELETE) may affect. A write whose affected-row count would
             exceed this is executed inside a transaction, checked, and rolled back so nothing persists, then blocked.
             Enforced independently of human approval. 0 means unlimited.
+        content_scan_mode:
+          type: string
+          enum:
+            - 'off'
+            - annotate
+            - block
+          default: 'off'
+          description: >-
+            Result-content scanning, accepted and stored but not yet enforced: no released proxy build reads this field,
+            so today every value behaves like off. Once enforcement ships on the data-plane relay path, values on their
+            way out to an agent will be checked for instruction-shaped content (stored prompt injection). off will scan
+            nothing and cost nothing. annotate will forward every value unchanged and record what it found. block will
+            additionally refuse the statement with an error naming the column, and never drop a row silently. A proxy
+            build without result-content scanning ignores this field.
+        content_scan_max_bytes:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 0
+          description: >-
+            Byte budget for one statement's content scan, spanning all values in the result. Stored but not yet read by
+            any released proxy build, like content_scan_mode. Once enforced, values past it are reported unscannable
+            rather than skipped quietly. 0 uses the scanner default (4 MiB), which covers an interactive result set and
+            deliberately does not cover a bulk export.
     ListPolicyProfilesResponse:
       type: object
       description: Cursor-paginated list of policy profiles for a project.
