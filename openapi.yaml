@@ -489,6 +489,187 @@ paths:
           $ref: '#/components/responses/UnsupportedMediaType'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/projects/{project_id}/anomaly-rules:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: createAnomalyRule
+      summary: Create an anomaly rule
+      description: |
+        Retunes one detection metric for this project, or for one agent credential
+        in it. Without a rule every metric resolves to the deployment default.
+
+        A rule adds no detection algorithm and no alert kind: it changes how
+        sensitive one of the five existing metrics is. enabled=false silences that
+        metric for that scope; the baseline keeps advancing, so re-enabling
+        resumes from the existing history rather than a cold warm-up.
+      tags:
+        - Anomalies
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnomalyRuleInput'
+      responses:
+        '201':
+          description: Anomaly rule created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnomalyRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      operationId: listAnomalyRules
+      summary: List anomaly rules
+      description: Lists the project's anomaly rules, including silenced ones.
+      tags:
+        - Anomalies
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          description: Page of anomaly rules.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListAnomalyRulesResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/projects/{project_id}/anomaly-rules/{anomaly_rule_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/AnomalyRuleId'
+    get:
+      operationId: getAnomalyRule
+      summary: Get an anomaly rule
+      description: Returns a single anomaly rule by ID.
+      tags:
+        - Anomalies
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          description: The anomaly rule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnomalyRule'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      operationId: updateAnomalyRule
+      summary: Update an anomaly rule
+      description: |
+        Replaces the rule's scope, metric and sensitivity. A rule whose enabled
+        flag is turned off silences its metric for its scope rather than being
+        deactivated.
+      tags:
+        - Anomalies
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnomalyRuleInput'
+      responses:
+        '200':
+          description: Updated anomaly rule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnomalyRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      operationId: deleteAnomalyRule
+      summary: Delete an anomaly rule
+      description: |
+        Removes the rule, so its metric returns to the deployment default for that
+        scope. Deleting a rule that was silencing a metric turns that metric's
+        alerts back on.
+      tags:
+        - Anomalies
+      responses:
+        '204':
+          description: Anomaly rule deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /v1/projects/{project_id}/approvals:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -4331,6 +4512,14 @@ components:
       schema:
         type: string
         pattern: ^[a-zA-Z0-9_.-]+$
+    AnomalyRuleId:
+      name: anomaly_rule_id
+      in: path
+      required: true
+      description: Unique anomaly rule identifier (prefixed, e.g. anr_xxx).
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9_.-]+$
     BranchId:
       name: branch_id
       in: path
@@ -5126,6 +5315,139 @@ components:
         next_page_token:
           type: string
           description: Token for the next page. Empty if no more results.
+    AnomalyMetric:
+      type: string
+      description: >
+        One of the five detection metrics. A rule retunes how sensitive one of them is; it adds no detection algorithm
+        and no alert kind.
+      enum:
+        - queries_per_hour
+        - bytes_per_hour
+        - distinct_shapes
+        - errors_per_hour
+        - active_hours
+      example: bytes_per_hour
+    AnomalyRule:
+      type: object
+      description: >
+        Per-project (and optionally per-credential) sensitivity for one detection metric. Without a rule every metric
+        resolves to the deployment default, so a noisy credential cannot be loosened, a sensitive one cannot be
+        tightened, and off-hours cannot be silenced for a credential that legitimately runs at 3am.
+      required:
+        - id
+        - project_id
+        - metric
+        - enabled
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          description: Unique anomaly rule identifier.
+          example: anr_01j9x8y7z6w5v4u3t2s1r0q9p8
+        project_id:
+          type: string
+          description: Project the rule belongs to.
+          example: prj_01j9x8y7z6w5v4u3t2s1r0q9p8
+        credential_id:
+          type: string
+          nullable: true
+          description: |
+            Agent credential the rule applies to. Null applies it to every credential in the project.
+          example: agt_01j9x8y7z6w5v4u3t2s1r0q9p8
+        metric:
+          $ref: '#/components/schemas/AnomalyMetric'
+        sigma_threshold:
+          type: number
+          format: double
+          nullable: true
+          description: |
+            N in the "mean + N * dispersion" spike rule. Null leaves the deployment default in place.
+          example: 4.5
+        floor:
+          type: number
+          format: double
+          nullable: true
+          description: >
+            Absolute floor below which the metric never alerts. Null leaves the deployment default in place. Only
+            queries_per_hour, bytes_per_hour and errors_per_hour have a floor.
+          example: 100
+        enabled:
+          type: boolean
+          description: >
+            False silences this metric for this scope. Note the polarity is the opposite of honeytokens.enabled: the
+            rule IS the switch, so disabling it disables the metric rather than deactivating the rule.
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: When the rule was created.
+        updated_at:
+          type: string
+          format: date-time
+          description: When the rule was last updated.
+    AnomalyRuleInput:
+      type: object
+      description: >
+        Request body for creating or updating an anomaly rule. One rule exists per (project, credential, metric);
+        creating a second for the same scope is a conflict.
+      required:
+        - metric
+      properties:
+        credential_id:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: >
+            Agent credential to scope the rule to. Null or omitted applies it to every credential in the project. The
+            credential must belong to this project.
+          example: agt_01j9x8y7z6w5v4u3t2s1r0q9p8
+        metric:
+          $ref: '#/components/schemas/AnomalyMetric'
+        sigma_threshold:
+          type: number
+          format: double
+          nullable: true
+          exclusiveMinimum: true
+          minimum: 0
+          description: >
+            N in the "mean + N * dispersion" spike rule. Must be greater than zero; the detector reads any value at or
+            below zero as "use the default", so a stored zero could never mean what setting it would suggest. Rejected
+            for distinct_shapes and active_hours, which have no rate for sigma to put a threshold on. Null or omitted
+            leaves the deployment default in place.
+          example: 4.5
+        floor:
+          type: number
+          format: double
+          nullable: true
+          exclusiveMinimum: true
+          minimum: 0
+          description: >
+            Absolute floor below which the metric never alerts. Must be greater than zero, for the same reason as
+            sigma_threshold. Rejected for distinct_shapes and active_hours, which have no rate for a floor to bound.
+            Null or omitted leaves the deployment default in place.
+          example: 100
+        enabled:
+          type: boolean
+          default: true
+          description: >
+            False silences this metric for this scope. The baseline keeps advancing while it is silenced, so re-enabling
+            resumes from the existing history rather than a cold warm-up.
+          example: true
+    ListAnomalyRulesResponse:
+      type: object
+      description: Cursor-paginated anomaly rules for a project.
+      required:
+        - anomaly_rules
+      properties:
+        anomaly_rules:
+          type: array
+          description: Anomaly rules on the current page.
+          items:
+            $ref: '#/components/schemas/AnomalyRule'
+        next_page_token:
+          type: string
+          description: Opaque token for cursor-based pagination.
     ApprovalRequest:
       type: object
       description: A statement held by the gateway awaiting a human approval decision.
