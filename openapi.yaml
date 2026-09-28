@@ -11026,3 +11026,18 @@ x-iac-resources:
       update: updateHoneytoken
       delete: deleteHoneytoken
       list: listHoneytokens
+  AnomalyRule:
+    description: >-
+      Manages an anomaly rule: the sensitivity of one detection metric for one project, or for one agent credential in
+      it. Without a rule every metric resolves to the deployment default, so a credential that legitimately runs at 3am
+      cannot be exempted and a noisy one cannot be loosened. Note the polarity of enabled: the rule IS the switch, so
+      enabled=false silences the metric for that scope rather than deactivating the rule. One rule exists per (project,
+      credential, metric); a second one for the same scope is a conflict. Detection runs in the control plane and
+      re-reads the rules on every pass, so a write takes effect at the next detection pass rather than being pushed to
+      the proxy.
+    operations:
+      create: createAnomalyRule
+      read: getAnomalyRule
+      update: updateAnomalyRule
+      delete: deleteAnomalyRule
+      list: listAnomalyRules
