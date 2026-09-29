@@ -5502,6 +5502,12 @@ components:
           description: Relations the statement touches, from the gateway's parse analysis.
           items:
             type: string
+        approval_rule_name:
+          type: string
+          nullable: true
+          description: >-
+            Name of the approval rule that held the statement, as it was named when the statement was held. Null when
+            the policy profile's approval_mode held it rather than a rule.
         status:
           type: string
           enum:
