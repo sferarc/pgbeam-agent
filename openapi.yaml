@@ -1604,7 +1604,7 @@ paths:
       summary: Scan a database for likely-PII columns
       description: >-
         Connects to the upstream database read-only, inspects information_schema and samples column values against PII
-        heuristics, and returns ranked masking suggestions. Suggestions are advisory — the operator reviews them and
+        heuristics, and returns ranked masking suggestions. Suggestions are advisory: the operator reviews them and
         applies the ones they want into a policy profile's masking rules. Nothing is auto-applied.
       tags:
         - Databases
@@ -1637,7 +1637,7 @@ paths:
       summary: Read a database's schema catalog
       description: >-
         Connects to the upstream database read-only and returns its user relations (tables and views) and columns.
-        Powers table/column autocomplete and view-aware warnings in the policy editor — relation kind distinguishes a
+        Powers table/column autocomplete and view-aware warnings in the policy editor. Relation kind distinguishes a
         view (whose masking/row-filters apply to the view itself, not its base tables) from a base table, and a
         per-column is_binary flag flags columns that mask to NULL. System schemas are excluded; nothing is persisted.
       tags:
@@ -8321,7 +8321,7 @@ components:
       type: object
       description: >-
         A single likely-PII column detected by the scanner, with a recommended masking rule. Suggestions are advisory
-        only — nothing is applied until the operator reviews and adds it to a policy profile.
+        only: nothing is applied until the operator reviews and adds it to a policy profile.
       required:
         - schema
         - table
@@ -9121,8 +9121,8 @@ components:
             - mask
             - row-filter
           description: >-
-            allow — permitted unchanged; block — rejected; mask — permitted but listed result columns are masked;
-            row-filter — permitted but a WHERE predicate is injected (and any listed columns are also masked).
+            allow: permitted unchanged; block: rejected; mask: permitted but listed result columns are masked;
+            row-filter: permitted but a WHERE predicate is injected (and any listed columns are also masked).
         rule:
           type: string
           description: >-
@@ -9702,8 +9702,8 @@ components:
         is_binary:
           type: boolean
           description: >-
-            True for binary-typed columns (e.g. bytea). Masking a binary column always returns NULL — a redact/hash
-            token would corrupt the wire type — so the editor warns when a masking rule targets one.
+            True for binary-typed columns (e.g. bytea). Masking a binary column always returns NULL, because a
+            redact/hash token would corrupt the wire type, so the editor warns when a masking rule targets one.
     SchemaCatalogRelation:
       type: object
       description: One relation (base table or view) in the schema catalog.
@@ -9730,7 +9730,7 @@ components:
             - other
           description: >-
             Relation kind. Allowlists, masking, and row-filters are enforced against the named relation itself, NOT
-            through a view to its base tables — so a view over a row-filtered base table can leak. The editor warns when
+            through a view to its base tables, so a view over a row-filtered base table can leak. The editor warns when
             a policy entry targets a view.
         columns:
           type: array
