@@ -5853,6 +5853,43 @@ components:
           description: >-
             True when the session has more entries than one summary reads. The counts and tables then cover the oldest
             entries in the window only; narrow it with start/end.
+        anomalies:
+          $ref: '#/components/schemas/AuditSessionAnomalies'
+    AuditSessionAnomalies:
+      type: object
+      description: >-
+        Anomaly alerts related to the session, split by how they relate to it. Absent from the summary when the caller's
+        role does not hold anomaly:read, because alerts are read under that permission everywhere else and the summary
+        is gated on audit:read.
+      required:
+        - session_alerts
+        - credential_window_alerts
+        - truncated
+      properties:
+        session_alerts:
+          type: array
+          description: >-
+            Alerts raised from one of this session's own audit entries (a honeytoken trip or a flagged query result),
+            oldest first. Two limits apply. Alerts are deduplicated per credential, kind and window, so a hit that
+            repeats an alert already open on the same credential raises nothing new: an empty list means no new alert
+            was raised for this session, not that nothing happened in it, and the session's own canary_tripped and
+            content_flagged audit entries are the complete record. And a session ID is not unique over time, so an alert
+            from a different connection that drew the same ID can appear here.
+          items:
+            $ref: '#/components/schemas/AnomalyAlert'
+        credential_window_alerts:
+          type: array
+          description: >-
+            Rate and shape alerts (query volume, egress, error rate, new query shapes, unusual hours) raised for this
+            session's credentials over a window that overlaps the session, oldest first. These are computed across every
+            session the credential ran in that window and are not attributed to this one.
+          items:
+            $ref: '#/components/schemas/AnomalyAlert'
+        truncated:
+          type: boolean
+          description: >-
+            True when either list reached the per-list cap and more alerts exist than are shown. Read the full set from
+            the anomalies list endpoint.
     AuditChainVerification:
       type: object
       description: >-
