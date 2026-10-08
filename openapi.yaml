@@ -676,6 +676,195 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/projects/{project_id}/approval-rules:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: createApprovalRule
+      summary: Create an approval rule
+      description: |
+        Sends the agent statements the rule matches to a human for approval,
+        whatever the policy profile's approval_mode says. A rule can only add
+        approval; nothing here can exempt a statement from approval_mode.
+
+        The rule is pushed to connected data planes when it is written. A
+        reviewer sees its name on every approval request it holds.
+
+        Returns 409 for an enabled rule while the organization has a live
+        self-hosted data plane enrollment, because PgBeam cannot yet confirm
+        that a self-hosted proxy runs a build that enforces approval rules. A
+        rule with enabled set to false is still accepted.
+      tags:
+        - Approvals
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRuleInput'
+      responses:
+        '201':
+          description: Approval rule created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      operationId: listApprovalRules
+      summary: List approval rules
+      description: Lists the project's approval rules, including disabled ones.
+      tags:
+        - Approvals
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          description: Page of approval rules.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListApprovalRulesResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/projects/{project_id}/approval-rules/{approval_rule_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/ApprovalRuleId'
+    get:
+      operationId: getApprovalRule
+      summary: Get an approval rule
+      description: Returns a single approval rule by ID.
+      tags:
+        - Approvals
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          description: The approval rule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRule'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      operationId: updateApprovalRule
+      summary: Update an approval rule
+      description: |
+        Replaces the rule's name, statement kinds, scope, row threshold and
+        enabled flag. An approval request already held keeps the name it was
+        held under.
+
+        Returns 409 when the update leaves the rule enabled while the
+        organization has a live self-hosted data plane enrollment, for the same
+        reason as create. Setting enabled to false is still accepted.
+      tags:
+        - Approvals
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalRuleInput'
+      responses:
+        '200':
+          description: Updated approval rule.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalRule'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      operationId: deleteApprovalRule
+      summary: Delete an approval rule
+      description: |
+        Removes the rule, so the statements it matched are held only if the
+        policy profile's approval_mode holds them. Approval requests it already
+        held are not affected.
+      tags:
+        - Approvals
+      responses:
+        '204':
+          description: Approval rule deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /v1/projects/{project_id}/approvals:
     parameters:
       - $ref: '#/components/parameters/ProjectId'
@@ -3513,6 +3702,10 @@ paths:
       description: >-
         Issues an enrollment token a self-hosted (BYOC) proxy uses to authenticate to the control plane's config/audit
         gRPC stream. The token is returned once and cannot be retrieved again. Requires the Scale or enterprise plan.
+
+        Returns 409 while any project in the organization has an enabled approval rule, because PgBeam cannot yet
+        confirm that a self-hosted proxy runs a build that enforces approval rules. Disable those rules first; they can
+        be saved with enabled set to false.
       tags:
         - Platform
       parameters:
@@ -4700,6 +4893,14 @@ components:
         type: string
         pattern: ^[a-zA-Z0-9_.-]+$
         example: 9f3c1a7b2e4d6058b1c9d3f5a7e02468
+    ApprovalRuleId:
+      name: approval_rule_id
+      in: path
+      required: true
+      description: Unique approval rule identifier (prefixed, e.g. apl_xxx).
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9_.-]+$
   responses:
     BadRequest:
       description: >-
@@ -5582,6 +5783,143 @@ components:
         next_page_token:
           type: string
           description: Token for the next page. Empty if no more results.
+    ApprovalRuleStatementKind:
+      type: string
+      enum:
+        - insert
+        - update
+        - delete
+        - ddl
+      description: >
+        A statement kind an approval rule can hold. COPY and reads are not in the vocabulary: approval reasons about the
+        same kinds approval_mode does.
+    ApprovalRule:
+      type: object
+      description: >
+        A named, project-scoped rule that sends the agent statements it matches to a human for approval, whatever the
+        policy profile's approval_mode says. A rule can only add approval: approval_mode stays the coarse switch and no
+        rule can exempt a statement from it.
+      required:
+        - id
+        - project_id
+        - name
+        - statement_kinds
+        - enabled
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          description: Unique approval rule identifier.
+          example: apl_01j9x8y7z6w5v4u3t2s1r0q9p8
+        project_id:
+          type: string
+          description: Project the rule belongs to.
+          example: prj_01j9x8y7z6w5v4u3t2s1r0q9p8
+        name:
+          type: string
+          description: |
+            Label shown to the reviewer on every approval request this rule holds. Unique within the project.
+          example: payments deletes
+        statement_kinds:
+          type: array
+          description: Statement kinds the rule holds. Empty holds every kind.
+          items:
+            $ref: '#/components/schemas/ApprovalRuleStatementKind'
+        schema_name:
+          type: string
+          nullable: true
+          description: Schema the rule is scoped to. Null matches every schema.
+          example: public
+        relation_name:
+          type: string
+          nullable: true
+          description: >
+            Relation the rule is scoped to. Null matches every relation. Without a schema it matches that name in every
+            schema.
+          example: payments
+        min_affected_rows:
+          type: integer
+          format: int32
+          nullable: true
+          description: >
+            Hold only statements affecting at least this many rows. Null holds every matching statement. A statement
+            whose affected rows cannot be counted (DDL, a batch, a data-modifying CTE) is held regardless.
+          example: 1000
+        enabled:
+          type: boolean
+          description: False switches the rule off, so it holds nothing.
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: When the rule was created.
+        updated_at:
+          type: string
+          format: date-time
+          description: When the rule was last updated.
+    ApprovalRuleInput:
+      type: object
+      description: Request body for creating or updating an approval rule.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: >
+            Label shown to the reviewer on every approval request this rule holds. Must be unique within the project and
+            not blank.
+          example: payments deletes
+        statement_kinds:
+          type: array
+          description: Statement kinds the rule holds. Empty or omitted holds every kind.
+          items:
+            $ref: '#/components/schemas/ApprovalRuleStatementKind'
+        schema_name:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Schema to scope the rule to. Null, empty or omitted matches every schema.
+          example: public
+        relation_name:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: >
+            Relation to scope the rule to. Null, empty or omitted matches every relation. Without a schema it matches
+            that name in every schema.
+          example: payments
+        min_affected_rows:
+          type: integer
+          format: int32
+          nullable: true
+          minimum: 1
+          description: >
+            Hold only statements affecting at least this many rows. Must be at least 1. Null or omitted holds every
+            matching statement. The count is taken in a rolled-back trial run; a statement that reports no count (DDL, a
+            batch, a data-modifying CTE) is held regardless.
+          example: 1000
+        enabled:
+          type: boolean
+          default: true
+          description: False switches the rule off, so it holds nothing.
+          example: true
+    ListApprovalRulesResponse:
+      type: object
+      description: Cursor-paginated approval rules for a project.
+      required:
+        - approval_rules
+      properties:
+        approval_rules:
+          type: array
+          description: Approval rules on the current page.
+          items:
+            $ref: '#/components/schemas/ApprovalRule'
+        next_page_token:
+          type: string
+          description: Opaque token for cursor-based pagination.
     AuditDecision:
       type: string
       description: >-
