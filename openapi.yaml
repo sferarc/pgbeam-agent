@@ -3462,6 +3462,204 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/projects/{project_id}/query-templates:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+    post:
+      operationId: createQueryTemplate
+      summary: Create a query template
+      description: |
+        Adds a named, parameterized statement to the project. A template admits
+        a statement for a policy profile that runs templates only; it never
+        grants access, and the statement still meets the credential's whole
+        policy.
+
+        The SQL is parsed and checked when it is written: exactly one SELECT,
+        INSERT, UPDATE or DELETE, placeholders $1 to $n, one declared parameter
+        for each. A template that fails is refused with 400 and a message
+        naming the problem. Returns 409 when the project already has a template
+        of that name.
+
+        The template is pushed to connected data planes when it is written.
+
+        Returns 409 for an enabled template while the organization has a live
+        self-hosted data plane enrollment, because PgBeam cannot yet confirm
+        that a self-hosted proxy runs a build that enforces templates. A
+        template with enabled set to false is still accepted.
+      tags:
+        - Policies
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryTemplateInput'
+      responses:
+        '201':
+          description: Query template created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryTemplate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      operationId: listQueryTemplates
+      summary: List query templates
+      description: Lists the project's query templates, including disabled ones.
+      tags:
+        - Policies
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageToken'
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          description: Page of query templates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListQueryTemplatesResponse'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/projects/{project_id}/query-templates/{query_template_id}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectId'
+      - $ref: '#/components/parameters/QueryTemplateId'
+    get:
+      operationId: getQueryTemplate
+      summary: Get a query template
+      description: Returns a single query template by ID.
+      tags:
+        - Policies
+      parameters:
+        - $ref: '#/components/parameters/IfNoneMatch'
+      responses:
+        '200':
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          description: The query template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryTemplate'
+        '304':
+          $ref: '#/components/responses/NotModified'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      operationId: updateQueryTemplate
+      summary: Update a query template
+      description: |
+        Replaces the template's name, description, SQL, parameters, include_sql
+        and enabled flag. The SQL is checked as on create. A statement already
+        admitted under the old template is not affected; the next one is
+        matched against the new text.
+
+        Returns 409 on a rename to a name the project already uses, and when
+        the update leaves the template enabled while the organization has a
+        live self-hosted data plane enrollment, for the same reason as create.
+        Setting enabled to false is still accepted.
+      tags:
+        - Policies
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryTemplateInput'
+      responses:
+        '200':
+          description: Updated query template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryTemplate'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      operationId: deleteQueryTemplate
+      summary: Delete a query template
+      description: |
+        Removes the template, so a profile that runs templates only stops
+        admitting its statement. Deleting the last template is allowed: such a
+        profile then admits nothing, which is the intended way to withdraw
+        access in an incident.
+      tags:
+        - Policies
+      responses:
+        '204':
+          description: Query template deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /v1/regions:
     get:
       operationId: listRegions
@@ -4918,6 +5116,14 @@ components:
       in: path
       required: true
       description: Unique approval rule identifier (prefixed, e.g. apl_xxx).
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9_.-]+$
+    QueryTemplateId:
+      name: query_template_id
+      in: path
+      required: true
+      description: Unique query template identifier (prefixed, e.g. qtp_xxx).
       schema:
         type: string
         pattern: ^[a-zA-Z0-9_.-]+$
@@ -9889,6 +10095,184 @@ components:
           description: Optional human-readable label for this CIDR entry (e.g. "Office", "VPC").
           maxLength: 100
           example: Office network
+    QueryTemplateParamType:
+      type: string
+      enum:
+        - text
+        - integer
+        - bigint
+        - double precision
+        - numeric
+        - boolean
+        - uuid
+        - date
+        - timestamptz
+        - jsonb
+      description: >
+        The Postgres type a template parameter is declared as. An argument is checked against it and bound as a value of
+        that type, never as SQL.
+    QueryTemplateStatementKind:
+      type: string
+      enum:
+        - select
+        - insert
+        - update
+        - delete
+      description: >
+        The statement kind a template compiles to. Absent on a stored template that no longer compiles, which a data
+        plane skips rather than admits.
+    QueryTemplateParam:
+      type: object
+      description: >
+        One declared template parameter. Its position in the params array is its placeholder number, so the first entry
+        is $1.
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+          pattern: ^[a-z][a-z0-9_]{0,62}$
+          description: >
+            Parameter name, a lower-case identifier. Unique within the template. An agent passes the argument under this
+            name.
+          example: customer_id
+        type:
+          $ref: '#/components/schemas/QueryTemplateParamType'
+        nullable:
+          type: boolean
+          default: false
+          description: >
+            True lets the argument be omitted or null, which binds SQL NULL. A parameter that is not nullable must be
+            given a value.
+          example: false
+    QueryTemplate:
+      type: object
+      description: >
+        A named, parameterized statement, scoped to a project. A policy profile set to admit templates only lets its
+        credentials run the project's enabled templates and nothing else. A template admits a statement; it never grants
+        access. A statement it admits still meets the credential's whole policy (allowlists, masking, row filters,
+        budgets and approvals).
+      required:
+        - id
+        - project_id
+        - name
+        - description
+        - sql
+        - params
+        - include_sql
+        - enabled
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          description: Unique query template identifier.
+          example: qtp_01j9x8y7z6w5v4u3t2s1r0q9p8
+        project_id:
+          type: string
+          description: Project the template belongs to.
+          example: prj_01j9x8y7z6w5v4u3t2s1r0q9p8
+        name:
+          type: string
+          description: |
+            Name an agent invokes the template by. A lower-case identifier, unique within the project.
+          example: open_orders_for_customer
+        description:
+          type: string
+          description: What the template is for, shown to an agent that lists the templates.
+          example: Open orders for one customer, newest first.
+        sql:
+          type: string
+          description: >
+            The statement, with its parameters as $1, $2 and so on. Exactly one SELECT, INSERT, UPDATE or DELETE.
+            Matched on its parse tree, so whitespace, keyword case and comments do not matter and anything else does.
+          example: SELECT id, total FROM orders WHERE customer_id = $1 AND status = 'open' ORDER BY created_at DESC
+        params:
+          type: array
+          description: Declared parameters, in placeholder order.
+          items:
+            $ref: '#/components/schemas/QueryTemplateParam'
+        statement_kind:
+          $ref: '#/components/schemas/QueryTemplateStatementKind'
+        include_sql:
+          type: boolean
+          description: >
+            True shows the SQL text to an agent that lists the templates. False shows only the name, description and
+            parameters.
+          example: false
+        enabled:
+          type: boolean
+          description: False withdraws the template, so it admits nothing.
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: When the template was created.
+        updated_at:
+          type: string
+          format: date-time
+          description: When the template was last updated.
+    QueryTemplateInput:
+      type: object
+      description: Request body for creating or updating a query template.
+      required:
+        - name
+        - sql
+      properties:
+        name:
+          type: string
+          pattern: ^[a-z][a-z0-9_]{0,62}$
+          description: >
+            Name an agent invokes the template by. A lower-case identifier starting with a letter, at most 63
+            characters, unique within the project.
+          example: open_orders_for_customer
+        description:
+          type: string
+          maxLength: 1000
+          description: What the template is for, shown to an agent that lists the templates.
+          example: Open orders for one customer, newest first.
+        sql:
+          type: string
+          minLength: 1
+          maxLength: 16384
+          description: >
+            The statement, with its parameters as $1, $2 and so on. Exactly one SELECT, INSERT, UPDATE or DELETE, at
+            most 16384 bytes. Every placeholder must be declared in params and every declared parameter must be used.
+          example: SELECT id, total FROM orders WHERE customer_id = $1 AND status = 'open' ORDER BY created_at DESC
+        params:
+          type: array
+          maxItems: 32
+          description: Declared parameters, in placeholder order. Omitted means none.
+          items:
+            $ref: '#/components/schemas/QueryTemplateParam'
+        include_sql:
+          type: boolean
+          default: false
+          description: >
+            True shows the SQL text to an agent that lists the templates. Defaults to false, since a WHERE clause can
+            itself be sensitive.
+          example: false
+        enabled:
+          type: boolean
+          default: true
+          description: |
+            Defaults to true, so a template is admitted as soon as it is written. False saves it withdrawn.
+          example: true
+    ListQueryTemplatesResponse:
+      type: object
+      description: Cursor-paginated query templates for a project.
+      required:
+        - query_templates
+      properties:
+        query_templates:
+          type: array
+          description: Query templates on the current page.
+          items:
+            $ref: '#/components/schemas/QueryTemplate'
+        next_page_token:
+          type: string
+          description: Opaque token for cursor-based pagination.
     Region:
       type: object
       description: Data plane region available for PgBeam traffic.
