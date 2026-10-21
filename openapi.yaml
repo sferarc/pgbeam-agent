@@ -93,6 +93,10 @@ tags:
     x-icon: Layers
   - name: Internal
     description: Internal service-to-service endpoints
+    x-sdk-exclude:
+      - go
+      - ts
+      - python
   - name: MCP
     description: Model Context Protocol (MCP) remote server endpoint
     x-sdk-exclude:
