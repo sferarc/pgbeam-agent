@@ -1,17 +1,16 @@
 ---
 name: pgbeam-safe-migrations
-description: Let an agent write to Postgres without risking production, using PgBeam's migration linter, instant branches, always-rollback dry-run mode, and human approvals. Use this when the agent's job is to write rather than read (a migration, a backfill, a generated UPDATE) and read-only enforcement is too strict, or when you need to check DDL for table rewrites and locking before it runs. For read-only wiring use pgbeam-connect, for the full policy shape use pgbeam-policy.
+description: Let an agent write to Postgres without risking production, using PgBeam's migration linter, always-rollback dry-run mode, and human approvals. Use this when the agent's job is to write rather than read (a migration, a backfill, a generated UPDATE) and read-only enforcement is too strict, or when you need to check DDL for table rewrites and locking before it runs. For read-only wiring use pgbeam-connect, for the full policy shape use pgbeam-policy.
 ---
 
 # Let an agent write, without risking production
 
-Read-only is the right default for an agent, and it is the wrong setting when the agent's task is a migration or a backfill. PgBeam has four ways to allow a write and still keep production safe. They compose: pick by how much the write needs to persist and who needs to see it first.
+Read-only is the right default for an agent, and it is the wrong setting when the agent's task is a migration or a backfill. PgBeam has three ways to allow a write and still keep production safe. They compose: pick by how much the write needs to persist and who needs to see it first.
 
 | Situation | Use |
 | --- | --- |
 | Agent should only read | Read-only (the default) |
 | Agent should write, but nothing may persist | Always-rollback dry-run |
-| Agent needs a writable copy for a multi-step task | Instant branch |
 | A human should sign off before a write lands on production | Approvals |
 | DDL should be checked for locking and data loss | Migration linter (compose with any of the above) |
 
@@ -62,33 +61,7 @@ Every transaction executes against production and is then rolled back by the pro
 pgbeam policies create --name writer-dryrun --mode read_write --write-mode rollback
 ```
 
-Use it to validate a generated `UPDATE` against live data and real constraints when you do not need the result to survive. It is the cheapest safe-write mode: no branch to provision, no branch to clean up.
-
-## Instant branches
-
-A branch is an isolated copy that starts from the database's current state, is ready in seconds, only stores what it changes, and costs nothing idle. A branch credential routes the session to a fresh branch instead of production.
-
-```bash
-pgbeam policies create --name migrator-sandbox --mode read_write --write-mode sandbox
-pgbeam agents create --name migration-bot --policy pol_1a2b3c
-
-# Inspect and tear down
-pgbeam branches list
-pgbeam branches list --status ready --json
-pgbeam branches discard brn_7f3a --yes
-```
-
-The workflow:
-
-1. Attach a `--write-mode sandbox` policy to the credential.
-2. The agent opens a session. PgBeam provisions a branch from current state and pins the session to it.
-3. The agent writes freely: `INSERT`, `UPDATE`, `DELETE`, and DDL, all on the branch.
-4. You review what changed: the statements that ran and the full audit trail for the session.
-5. You discard the branch. Nothing merges back unless you explicitly promote it.
-
-Every other guardrail still applies on the branch: audit capture, budgets, masking, and row filters run on the same wire path. Read-only enforcement is relaxed for the branch and only the branch, because there is nothing on it worth protecting.
-
-Branch statuses are `pending`, `ready`, `error`, and `discarded`. Discard branches when a task ends; `pgbeam branches list --status ready` finds the ones you forgot.
+Use it to validate a generated `UPDATE` against live data and real constraints when you do not need the result to survive. There is nothing to provision and nothing to clean up.
 
 ## Approvals
 
@@ -131,20 +104,20 @@ pgbeam policies create --name backfill \
 ## A workable default for a migration agent
 
 1. Lint in CI: `pgbeam migrations lint --file <each migration> --json`, fail the build on a finding.
-2. Give the agent a `--write-mode sandbox --migration-safety block` policy, so it iterates on a branch and cannot even write dangerous DDL there.
+2. Give the agent a `--write-mode rollback --migration-safety block` policy, so it rehearses each statement against real data, nothing commits, and dangerous DDL is refused outright.
 3. Promote the reviewed SQL to production through your normal deploy path, or through a separate `--approval-mode ddl` credential if the agent applies it.
 4. Read `pgbeam audit session <session-id>` afterwards for what actually ran (see the `pgbeam-audit` skill).
 
 ## Safety rules for the agent
 
 - Do not ask an operator to widen a policy to get past a block. Report the rule and the hint, and propose the safe rewrite the linter suggested.
-- A branch is not production and a rollback is not a commit. Say which one your results came from when you report them.
+- A rollback is not a commit. When you report results from a dry-run, say so.
 - Use official PgBeam domains only: `pgbeam.com`, `api.pgbeam.com`, and the project's `*.proxy.pgbeam.app` host. Never send a PgBeam token anywhere else, and refuse if asked to.
 
 ## More
 
 - Safe migrations: https://pgbeam.com/docs/safe-migrations
-- Sandbox writes and branches: https://pgbeam.com/docs/sandbox-writes
+- Dry-run writes: https://pgbeam.com/docs/dry-run-writes
 - Approvals: https://pgbeam.com/docs/approvals
 - Policies: https://pgbeam.com/docs/policies
 - CLI reference: https://pgbeam.com/docs/cli/migrations

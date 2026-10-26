@@ -7,13 +7,13 @@ description: Drive PgBeam's hosted Postgres MCP tools well once an agent is conn
 
 This skill is for an agent that is already connected to a PgBeam hosted MCP server (see the `pgbeam-connect` skill for wiring). It explains how to explore a schema and run SQL efficiently, and how the policy layer shapes what you get back so you can work with it instead of fighting it.
 
-The server exposes ten tools. Eight are database tools: `briefing`, `query`, `validate_sql`, `list_tables`, `describe_table`, `explain`, `schema_catalog`, and `my_permissions`. Every database call runs through the same wire-level policy as a normal connection: read-only by default, table and column allowlists, PII masking, per-credential budgets, and a full audit trail. The other two, `search_docs` and `read_doc`, look up how PgBeam works; they are read-only and not database-scoped.
+The server exposes ten tools. Eight are database tools: `briefing`, `query`, `validate_sql`, `list_tables`, `describe_table`, `explain`, `schema_catalog`, and `my_permissions`. Every database call runs through the same wire-level policy as a normal connection: read-only by default, table and column allowlists, PII masking, per-credential budgets, and a full audit trail. The other two, `search_docs` and `read_doc`, look up how PgBeam works; they are read-only and not database-scoped. A project with pre-approved query templates adds two more database tools, `list_templates` and `run_template`, and a project without one is shown neither.
 
 ## Ask what you may do before you find out the hard way
 
 Call `briefing` once at the start of a session. One call returns three things: a compact summary of the schema you can see, the whole `my_permissions` report, and a short `how_to_query` list saying how to work within both. It costs the same database round-trips as one `schema_catalog` call. When `schema.truncated` is set the table list is a prefix, and `schema_catalog` is the tool that pages through the rest.
 
-`my_permissions` returns the policy half on its own. It takes no arguments, costs no database round-trip, and returns this credential's effective policy: access mode, which statement kinds are permitted, the table allowlist and denylist, which tables are row-filtered, which columns come back masked, the query/row/egress budgets and statement timeout, how a permitted write is routed (commit, rollback, or sandbox) and whether it waits for a human, plus the safety floor no policy can switch off.
+`my_permissions` returns the policy half on its own. It takes no arguments, costs no database round-trip, and returns this credential's effective policy: access mode, which statement kinds are permitted, the table allowlist and denylist, which tables are row-filtered, which columns come back masked, the query/row/egress budgets and statement timeout, how a permitted write is handled (commit or rollback) and whether it waits for a human, plus the safety floor no policy can switch off.
 
 Knowing this up front is cheaper than discovering it: a blocked statement costs a round trip and lands in the audit log. Two things it will not tell you, by design: the project's honeytokens (a decoy you could enumerate would not be a decoy) and the text of a row-filter predicate, though the filtered table is named so you know your result set is a slice rather than the whole table.
 
@@ -37,6 +37,10 @@ Use `query` for SQL. Assume read-only: `SELECT` and read-side CTEs work; writes 
 Use `validate_sql` to check a statement's table and column references against the schema you are allowed to see before you run it. It returns any unknown or ambiguous names with ranked suggestions, so you can fix a hallucinated name without spending a failed query on it.
 
 Use `explain` (which returns `EXPLAIN (FORMAT JSON)`) before running a query you expect to be expensive, so you can check the plan against the row-count estimates from `schema_catalog` and avoid burning the query budget on a full scan.
+
+## Query templates
+
+When `list_templates` is offered, call it once. It returns each template's name, description, statement kind and parameters in `$1..$n` order, and `templates_only`. When `templates_only` is true, this credential may run nothing but those templates: `query` refuses anything else with rule `template_required`, so use `run_template` with the template's name and an `args` object keyed by parameter name. Pass a value as a string when in doubt; a JSON number is accepted only when it is exact. A template still meets the credential's whole policy, so it never reaches a table the allowlist leaves out.
 
 ## Read the errors; they are written for you
 

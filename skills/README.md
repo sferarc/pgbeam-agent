@@ -8,7 +8,7 @@ Installable [agent skills](https://agentskills.io) that teach an AI coding agent
 | [`pgbeam-policy`](./pgbeam-policy/SKILL.md) | Author a policy profile as code: access mode, table allow and deny lists, PII masking, row filters, budgets, write mode, with CLI and Terraform. Lint, dry-eval, and replay it before attaching it. |
 | [`pgbeam-mcp-usage`](./pgbeam-mcp-usage/SKILL.md) | Drive the hosted Postgres MCP tools well once connected: prefer `schema_catalog`, read the policy errors, work within read-only and masking. |
 | [`pgbeam-audit`](./pgbeam-audit/SKILL.md) | Answer "what did this agent do": read and filter the audit trail, summarize a session, export to CSV or a SIEM, verify the tamper-evident chain, and turn recorded traffic into a tighter policy. |
-| [`pgbeam-safe-migrations`](./pgbeam-safe-migrations/SKILL.md) | Let an agent write without risking production: lint DDL for locking and data loss, instant branches, always-rollback dry-run mode, and human approvals. |
+| [`pgbeam-safe-migrations`](./pgbeam-safe-migrations/SKILL.md) | Let an agent write without risking production: lint DDL for locking and data loss, always-rollback dry-run mode, and human approvals. |
 | [`pgbeam-cli`](./pgbeam-cli/SKILL.md) | Drive the `pgbeam` CLI: install, authenticate, link a project, register a database, pull a guarded `DATABASE_URL`, diagnose with `doctor`, and script anything with `--json`. |
 
 ## Install
