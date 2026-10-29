@@ -54,7 +54,7 @@ Adjust and retry based on the reason. Do not loop on the identical failing query
 
 ## Pace yourself against the budget block
 
-When the credential is capped, `query`, `explain`, `list_tables`, and `describe_table` return a `budget` block alongside the rows: `limit`, `used`, `remaining`, and `resets_at` for each capped window (`queries_per_hour`, `queries_per_day`, `egress_bytes_per_day`). A window the policy leaves uncapped is omitted, and an uncapped credential gets no block at all.
+When the credential is capped, `query`, `explain`, `list_tables`, and `describe_table` return a `budget` block alongside the rows: `limit`, `used`, `remaining`, and `resets_at` for each capped window (`queries_per_hour`, `queries_per_day`, `egress_bytes_per_day`). A window the policy leaves uncapped is omitted, and an uncapped credential gets no block at all. `my_permissions` returns the same block without spending a query, so check it there before a long job.
 
 Read `remaining` before starting anything long. If a plan needs more calls than are left, do the expensive part first, batch reads into fewer statements, or stop and say what you could not finish, rather than spending the last of the budget and being blocked mid-task. The counts are per-region approximations and the egress figure can trail your last statement by a moment, so leave headroom instead of aiming at zero.
 
