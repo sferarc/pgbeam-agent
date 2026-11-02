@@ -6906,6 +6906,8 @@ components:
         - max_connections
         - queries_per_second
         - bytes_per_month
+        - overage_per_1k
+        - overage_per_gb
         - max_query_shapes
         - included_seats
         - max_agent_credentials
@@ -6935,6 +6937,18 @@ components:
           type: integer
           format: int64
           description: Monthly data transfer quota in bytes. 0 means unlimited.
+        overage_per_1k:
+          type: number
+          format: double
+          description: >-
+            Price in USD for each 1,000 queries over the daily quota. 0 means the quota is a hard cap and no query
+            overage is billed.
+        overage_per_gb:
+          type: number
+          format: double
+          description: >-
+            Price in USD for each GB transferred over the monthly quota. 0 means the quota is a hard cap and no transfer
+            overage is billed.
         max_query_shapes:
           type: integer
           description: Maximum query shapes in cache rules. 0 means unlimited.
