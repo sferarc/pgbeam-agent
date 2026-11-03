@@ -3100,6 +3100,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
         '413':
@@ -3961,9 +3963,10 @@ paths:
         Issues an enrollment token a self-hosted (BYOC) proxy uses to authenticate to the control plane's config/audit
         gRPC stream. The token is returned once and cannot be retrieved again. Requires the Scale or enterprise plan.
 
-        Returns 409 while any project in the organization has an enabled approval rule, because PgBeam cannot yet
-        confirm that a self-hosted proxy runs a build that enforces approval rules. Disable those rules first; they can
-        be saved with enabled set to false.
+        Returns 409 while any project in the organization has an enabled approval rule, a policy profile with query_mode
+        set to templates, or a policy profile with a non-empty function_denylist, because PgBeam cannot yet confirm that
+        a self-hosted proxy runs a build that enforces them. Disable those rules (they can be saved with enabled set to
+        false), set those profiles' query_mode to sql and empty their function_denylist first.
       tags:
         - Platform
       parameters:
@@ -9191,6 +9194,7 @@ components:
         - table_denylist
         - masking_rules
         - query_mode
+        - function_denylist
         - created_at
         - updated_at
       properties:
@@ -9354,6 +9358,20 @@ components:
             template_required, MCP query included. A matched template still meets every other rule on this profile: a
             template narrows what an agent can run and never grants access. The hosted MCP discovery tools (list_tables,
             describe_table, schema_catalog) keep working under templates.
+        function_denylist:
+          type: array
+          description: >-
+            Functions an agent on this profile may not call, refused with SQLSTATE 42501 and decision rule
+            function_denied. This adds to the proxy's built-in dangerous-function floor, which no profile can relax.
+            Matching is case-insensitive and sees every call in the statement, including inside a CTE, a sub-select or a
+            function argument. A bare entry (recompute) matches the name in every schema. A schema-qualified entry
+            (billing.recompute) matches a call qualified with that schema and also an unqualified call of the same name,
+            since the proxy cannot see where search_path resolves it. A function reached only through an operator, a
+            cast, a view, a trigger or a column default is not matched. A proxy build older than this field ignores it,
+            so the API refuses a non-empty list while the organization has a live self-hosted enrollment.
+          items:
+            type: string
+            description: A function name, bare or schema-qualified.
         created_at:
           type: string
           format: date-time
@@ -9525,6 +9543,23 @@ components:
             enrollment, since an older self-hosted proxy ignores this field and would run unrestricted SQL. On create,
             omitting the field means sql. On update, omitting it keeps the stored mode, so a client that predates this
             field cannot widen a templates profile back to sql by saving it; send sql to do that.
+        function_denylist:
+          type: array
+          maxItems: 256
+          description: >-
+            Functions an agent on this profile may not call, on top of the proxy's built-in dangerous-function floor.
+            Each entry is a bare name (recompute) or one schema-qualified name (billing.recompute), with no whitespace,
+            quotes or parentheses and at most 63 bytes per part. A bare entry matches the name in every schema; a
+            qualified entry also matches an unqualified call of the same name. On create, omitting the field means an
+            empty list. On update, omitting it keeps the stored list, so a client that predates this field cannot clear
+            it by saving the profile; send an empty array to do that. A non-empty list is refused with 409 while the
+            organization has a live self-hosted enrollment, since an older self-hosted proxy ignores this field and
+            would let those calls run. An empty list is always accepted.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 127
+            description: A function name, bare or schema-qualified.
     ListPolicyProfilesResponse:
       type: object
       description: Cursor-paginated list of policy profiles for a project.
