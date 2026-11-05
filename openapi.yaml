@@ -91,12 +91,6 @@ tags:
   - name: Batch
     description: Apply many project-scoped operations in one request
     x-icon: Layers
-  - name: Internal
-    description: Internal service-to-service endpoints
-    x-sdk-exclude:
-      - go
-      - ts
-      - python
   - name: MCP
     description: Model Context Protocol (MCP) remote server endpoint
     x-sdk-exclude:
@@ -1212,6 +1206,8 @@ paths:
         batch is not a free way to probe the quota.
       tags:
         - Batch
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -1238,11 +1234,15 @@ paths:
         '409':
           description: >-
             An atomic batch was rolled back. Nothing applied. The failing operations carry their error and every other
-            one is `not_applied`.
+            one is `not_applied`. An `Idempotency-Key` reused with a different body answers 409 as problem details
+            instead, with code `IDEMPOTENCY_KEY_REUSED`.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BatchResponse'
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/TooManyRequests'
   /v1/plans:
@@ -1406,6 +1406,7 @@ paths:
         - ApiKeyAuth: []
       parameters:
         - $ref: '#/components/parameters/OrgId'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -1421,6 +1422,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '413':
           $ref: '#/components/responses/PayloadTooLarge'
         '415':
@@ -2635,6 +2638,8 @@ paths:
         higher-privilege flow.
       tags:
         - Account
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -2899,6 +2904,7 @@ paths:
             Ignored when it matches nothing this endpoint offers.
           schema:
             type: string
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: false
         content:
@@ -2953,6 +2959,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '503':
@@ -4316,36 +4324,6 @@ paths:
           $ref: '#/components/responses/UnsupportedMediaType'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /v1/internal/support/slack-event:
-    post:
-      operationId: handleSlackSupportEvent
-      summary: Handle a Slack support event
-      description: Receives a forwarded Slack event from the dashboard webhook handler and creates a support message.
-      tags:
-        - Internal
-      security:
-        - InternalSecret: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SlackEventPayload'
-      responses:
-        '200':
-          description: Event processed.
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '413':
-          $ref: '#/components/responses/PayloadTooLarge'
-        '415':
-          $ref: '#/components/responses/UnsupportedMediaType'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
   /v1/scan/text:
     post:
       operationId: scanText
@@ -5117,12 +5095,13 @@ components:
 
         Reusing a key with a different request body returns `409 Conflict`: a key is a promise about one specific
         request, so a changed body is a client bug rather than a retry. Keys are scoped to the calling organization (or
-        to the user, for account-scoped tokens), so one tenant can never read another's stored response.
+        to the user, for account-scoped tokens, or to the agent MCP token, for a budget top-up), so one tenant can never
+        read another's stored response.
 
 
-        A `5xx`, `408` or `429` is never stored, because those describe a request that produced no settled answer and
-        the next attempt with the same key must run for real. A `4xx` is stored: it is the server's settled answer about
-        this exact request.
+        A `5xx`, `402`, `408` or `429` is never stored, because those describe a request that produced no settled answer
+        and the next attempt with the same key must run for real: a `402` asks for that next attempt to carry a payment.
+        Any other `4xx` is stored: it is the server's settled answer about this exact request.
 
 
         Use a fresh UUID per logical operation. The PgBeam SDKs generate one per call and reuse it across their own
@@ -5288,11 +5267,6 @@ components:
       scheme: bearer
       bearerFormat: APIKey
       description: 'API key issued via the dashboard. Pass it as `Authorization: Bearer <api-key>`.'
-    InternalSecret:
-      type: apiKey
-      in: header
-      name: X-Internal-Secret
-      description: Shared secret for dashboard-to-API service calls.
   schemas:
     AccountExport:
       type: object
@@ -11060,27 +11034,6 @@ components:
           description: Messages in the support case thread.
           items:
             $ref: '#/components/schemas/SupportMessage'
-    SlackEventPayload:
-      type: object
-      description: Slack event forwarded from the dashboard webhook handler.
-      required:
-        - channel_id
-        - thread_ts
-        - user_id
-        - text
-      properties:
-        channel_id:
-          type: string
-          description: Slack channel ID where the message was posted.
-        thread_ts:
-          type: string
-          description: Slack thread timestamp identifying the support case thread.
-        user_id:
-          type: string
-          description: Slack user ID of the message author.
-        text:
-          type: string
-          description: Message text from Slack.
     ScanTextRequest:
       type: object
       description: >-
